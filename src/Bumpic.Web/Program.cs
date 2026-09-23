@@ -14,6 +14,7 @@ using Bumpic.Web.Services.ExternalIdentities;
 using Bumpic.Web.Services.SessionTokens;
 using Bumpic.Web.Clients.Store;
 using Bumpic.Web.Services.Store;
+using Bumpic.Web.Services.Invitations;
 using Bumpic.Web.Endpoints.StoreNotification;
 using Bumpic.Web.Utils;
 using FastEndpoints;
@@ -223,6 +224,7 @@ try
     builder.Services.Configure<EmailSenderOptions>(builder.Configuration.GetSection("Email"));
     builder.Services.AddSingleton<IEmailCodeSender, SmtpEmailCodeSender>();
     builder.Services.AddSingleton<IEmailCodeStore, RedisEmailCodeStore>();
+    builder.Services.AddSingleton<IInvitationWindowStore, InvitationWindowStore>();
     builder.Services.AddSingleton<IEmailCodeService, EmailCodeService>();
     builder.Services.AddSingleton<IValidateOptions<AccountDeletionOptions>, AccountDeletionOptionsValidator>();
     builder.Services.AddOptions<AccountDeletionOptions>().Bind(builder.Configuration.GetSection("AccountDeletion")).ValidateOnStart();

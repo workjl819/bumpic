@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using NetCorePal.Extensions.DistributedTransactions.CAP.Persistence;
 using Bumpic.Domain.AggregateModel.UserAccountAggregate;
+using Bumpic.Domain.AggregateModel.InvitationRecordAggregate;
 using Bumpic.Domain.AggregateModel.IdempotentRequestAggregate;
 using Bumpic.Domain.AggregateModel.PointAccountAggregate;
 using Bumpic.Domain.AggregateModel.StoreNotificationReceiptAggregate;
@@ -25,6 +26,9 @@ public partial class ApplicationDbContext(DbContextOptions<ApplicationDbContext>
     /// 外部身份集合。
     /// </summary>
     public DbSet<UserExternalIdentity> UserExternalIdentities => Set<UserExternalIdentity>();
+
+    /// <summary>邀请记录集合。</summary>
+    public DbSet<InvitationRecord> InvitationRecords => Set<InvitationRecord>();
 
     /// <summary>积分账户集合。</summary>
     public DbSet<PointAccount> PointAccounts => Set<PointAccount>();

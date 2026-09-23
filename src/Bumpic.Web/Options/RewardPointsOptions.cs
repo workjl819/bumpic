@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using Bumpic.Domain;
 
 namespace Bumpic.Web.Options;
 
@@ -12,6 +13,11 @@ public class RewardPointsOptions
     /// 配置节 <c>RewardPoints:Registration</c>，默认 5 点。
     /// </summary>
     public int Registration { get; set; } = 5;
+
+    /// <summary>
+    /// 邀请奖励点数；建立邀请关系时发放给邀请人。
+    /// </summary>
+    public int Invitation { get; set; } = InvitationPolicy.RewardPoints;
 
 }
 
@@ -30,6 +36,11 @@ public class RewardPointsOptionsValidator : IValidateOptions<RewardPointsOptions
         if (options.Registration <= 0 || options.Registration > 1000)
         {
             return ValidateOptionsResult.Fail("RewardPoints:Registration 必须在 1 到 1000 之间。");
+        }
+
+        if (options.Invitation <= 0 || options.Invitation > 1000)
+        {
+            return ValidateOptionsResult.Fail("RewardPoints:Invitation 必须在 1 到 1000 之间。");
         }
 
         return ValidateOptionsResult.Success;

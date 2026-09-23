@@ -11,10 +11,11 @@ namespace Bumpic.Web.Application.Commands.Registration;
 public record RegisterWithEmailResult(string NormalizedEmail);
 
 /// <summary>
-/// 邮箱注册命令：创建账户；注册验证码由 Endpoint 预先核销，当前不使用密码。
+/// 邮箱注册命令：创建账户并可选提交邀请码；注册验证码由 Endpoint 预先核销，当前不使用密码。
 /// </summary>
 public record RegisterWithEmailCommand(
-    string EmailAddress) : ICommand<RegisterWithEmailResult>;
+    string EmailAddress,
+    string? InvitationCode = null) : ICommand<RegisterWithEmailResult>;
 
 /// <summary>
 /// 邮箱注册命令验证器。
@@ -30,6 +31,8 @@ public class RegisterWithEmailCommandValidator : AbstractValidator<RegisterWithE
             .NotEmpty().WithMessage("邮箱不能为空")
             .EmailAddress().WithMessage("邮箱格式不正确")
             .MaximumLength(320).WithMessage("邮箱长度不能超过 320 个字符");
+        RuleFor(x => x.InvitationCode)
+            .MaximumLength(64).WithMessage("邀请码长度不能超过 64 个字符");
     }
 }
 
@@ -68,9 +71,24 @@ public class RegisterWithEmailCommandHandler(IUserAccountRepository userReposito
             throw new KnownException("EMAIL_ALREADY_REGISTERED");
         }
 
-        var user = UserAccount.Register(emailAddress: email);
+        var normalizedInvitationCode = NormalizeInvitationCode(request.InvitationCode);
+        var user = UserAccount.Register(
+            emailAddress: email,
+            submittedInvitationCode: normalizedInvitationCode);
         await userRepository.AddAsync(user, cancellationToken);
         return new RegisterWithEmailResult(email);
     }
 
+    /// <summary>
+    /// 规范化可选邀请码。
+    /// </summary>
+    private static string? NormalizeInvitationCode(string? invitationCode)
+    {
+        if (string.IsNullOrWhiteSpace(invitationCode))
+        {
+            return null;
+        }
+
+        return invitationCode.Trim().ToUpperInvariant();
+    }
 }
