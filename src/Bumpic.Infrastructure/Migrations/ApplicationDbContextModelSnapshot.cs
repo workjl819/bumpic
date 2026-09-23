@@ -17,10 +17,1018 @@ namespace Bumpic.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.0")
+                .HasAnnotation("ProductVersion", "10.0.10")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
 
             MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
+
+            modelBuilder.Entity("Bumpic.Domain.AggregateModel.IdempotentRequestAggregate.IdempotentRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id")
+                        .HasComment("幂等请求唯一标识");
+
+                    b.Property<int>("AttemptCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("attempt_count")
+                        .HasComment("成功领取执行权次数");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("completed_at")
+                        .HasComment("完成时间");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
+                        .HasComment("创建时间");
+
+                    b.Property<bool>("Deleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false)
+                        .HasColumnName("deleted")
+                        .HasComment("软删除标记");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasColumnType("varchar(255)")
+                        .HasColumnName("idempotency_key")
+                        .HasComment("客户端幂等键");
+
+                    b.Property<DateTimeOffset?>("LastAttemptAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("last_attempt_at")
+                        .HasComment("最近领取执行权时间");
+
+                    b.Property<DateTimeOffset?>("LeaseExpiresAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("lease_expires_at")
+                        .HasComment("当前执行租约截止时间");
+
+                    b.Property<Guid?>("LeaseToken")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("lease_token")
+                        .HasComment("当前执行 fencing 令牌");
+
+                    b.Property<DateTimeOffset?>("NextRetryAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("next_retry_at")
+                        .HasComment("最早再次领取时间");
+
+                    b.Property<string>("Operation")
+                        .IsRequired()
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("operation")
+                        .HasComment("幂等操作名称");
+
+                    b.Property<byte[]>("RequestHash")
+                        .IsRequired()
+                        .HasColumnType("binary(32)")
+                        .HasColumnName("request_hash")
+                        .HasComment("规范化请求摘要");
+
+                    b.Property<int>("RequestHashVersion")
+                        .HasColumnType("int")
+                        .HasColumnName("request_hash_version")
+                        .HasComment("请求摘要算法版本");
+
+                    b.Property<string>("ResultCode")
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("result_code")
+                        .HasComment("最近稳定或诊断结果码");
+
+                    b.Property<int>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("row_version")
+                        .HasComment("乐观并发控制版本");
+
+                    b.Property<int>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("status")
+                        .HasComment("请求处理状态");
+
+                    b.Property<Guid?>("StoreTransactionId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("store_transaction_id")
+                        .HasComment("已关联内部商店交易标识");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
+                        .HasComment("最近更新时间");
+
+                    b.Property<Guid>("UserAccountId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)")
+                        .HasDefaultValue(new Guid("00000000-0000-0000-0000-000000000000"))
+                        .HasColumnName("user_account_id")
+                        .HasComment("发起请求的用户标识");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status", "NextRetryAt");
+
+                    b.HasIndex("UserAccountId", "Operation", "IdempotencyKey");
+
+                    b.ToTable("idempotent_requests", (string)null);
+                });
+
+            modelBuilder.Entity("Bumpic.Domain.AggregateModel.PointAccountAggregate.AccountPointRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id")
+                        .HasComment("账户点数记录唯一标识");
+
+                    b.Property<int>("Amount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("amount")
+                        .HasComment("本次点数变化值");
+
+                    b.Property<string>("BusinessReference")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("varchar(255)")
+                        .HasDefaultValue("")
+                        .HasColumnName("business_reference")
+                        .HasComment("关联业务的唯一引用");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
+                        .HasComment("流水创建时间");
+
+                    b.Property<bool>("Deleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false)
+                        .HasColumnName("deleted")
+                        .HasComment("软删除标记");
+
+                    b.Property<Guid>("PointAccountId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)")
+                        .HasDefaultValue(new Guid("00000000-0000-0000-0000-000000000000"))
+                        .HasColumnName("point_account_id")
+                        .HasComment("逻辑关联的点数账户标识");
+
+                    b.Property<int>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("row_version")
+                        .HasComment("乐观并发控制版本");
+
+                    b.Property<int>("Type")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("type")
+                        .HasComment("点数流水类型");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
+                        .HasComment("流水更新时间");
+
+                    b.Property<Guid>("UserAccountId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)")
+                        .HasDefaultValue(new Guid("00000000-0000-0000-0000-000000000000"))
+                        .HasColumnName("user_account_id")
+                        .HasComment("冗余保存的用户账户标识");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessReference");
+
+                    b.ToTable("account_point_records", (string)null);
+                });
+
+            modelBuilder.Entity("Bumpic.Domain.AggregateModel.PointAccountAggregate.PointAccount", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id")
+                        .HasComment("点数账户唯一标识");
+
+                    b.Property<int>("AvailablePoints")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("available_points")
+                        .HasComment("当前可用点数");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
+                        .HasComment("点数账户创建时间");
+
+                    b.Property<bool>("Deleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false)
+                        .HasColumnName("deleted")
+                        .HasComment("软删除标记");
+
+                    b.Property<int>("FrozenPoints")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("frozen_points")
+                        .HasComment("当前冻结点数");
+
+                    b.Property<int>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("row_version")
+                        .HasComment("乐观并发控制版本");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
+                        .HasComment("点数账户最近更新时间");
+
+                    b.Property<Guid>("UserAccountId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)")
+                        .HasDefaultValue(new Guid("00000000-0000-0000-0000-000000000000"))
+                        .HasColumnName("user_account_id")
+                        .HasComment("所属用户账户标识");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserAccountId");
+
+                    b.ToTable("point_accounts", (string)null);
+                });
+
+            modelBuilder.Entity("Bumpic.Domain.AggregateModel.StoreNotificationReceiptAggregate.StoreNotificationReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id")
+                        .HasComment("通知收件记录标识");
+
+                    b.Property<int>("AttemptCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("attempt_count")
+                        .HasComment("处理尝试次数");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at")
+                        .HasComment("创建时间");
+
+                    b.Property<bool>("Deleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false)
+                        .HasColumnName("deleted")
+                        .HasComment("软删除标记");
+
+                    b.Property<string>("ExternalNotificationId")
+                        .IsRequired()
+                        .HasColumnType("varchar(255)")
+                        .HasColumnName("external_notification_id")
+                        .HasComment("平台通知唯一标识");
+
+                    b.Property<string>("FailureCode")
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("failure_code")
+                        .HasComment("最近失败码");
+
+                    b.Property<int?>("LastReplayParserVersion")
+                        .HasColumnType("int")
+                        .HasColumnName("last_replay_parser_version")
+                        .HasComment("最近重放解析器版本");
+
+                    b.Property<DateTimeOffset?>("LastReplayedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("last_replayed_at")
+                        .HasComment("最近重放时间");
+
+                    b.Property<DateTimeOffset?>("LeaseExpiresAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("lease_expires_at")
+                        .HasComment("处理租约截止时间");
+
+                    b.Property<string>("LeaseOwner")
+                        .HasColumnType("varchar(255)")
+                        .HasColumnName("lease_owner")
+                        .HasComment("处理租约所有者");
+
+                    b.Property<DateTimeOffset?>("NextRetryAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("next_retry_at")
+                        .HasComment("下一次重试时间");
+
+                    b.Property<string>("NormalizedPayload")
+                        .HasColumnType("longtext")
+                        .HasColumnName("normalized_payload")
+                        .HasComment("版本化规范通知载荷");
+
+                    b.Property<string>("NotificationType")
+                        .IsRequired()
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("notification_type")
+                        .HasComment("平台通知类型");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("occurred_at")
+                        .HasComment("平台事件发生时间");
+
+                    b.Property<int>("ParserVersion")
+                        .HasColumnType("int")
+                        .HasColumnName("parser_version")
+                        .HasComment("首次解析器版本");
+
+                    b.Property<byte[]>("PayloadHash")
+                        .IsRequired()
+                        .HasColumnType("binary(32)")
+                        .HasColumnName("payload_hash")
+                        .HasComment("原始载荷 SHA-256");
+
+                    b.Property<DateTimeOffset?>("ProcessedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("processed_at")
+                        .HasComment("处理完成时间");
+
+                    b.Property<string>("RawPayload")
+                        .IsRequired()
+                        .HasColumnType("longtext")
+                        .HasColumnName("raw_payload")
+                        .HasComment("原始通知载荷");
+
+                    b.Property<int>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("row_version")
+                        .HasComment("乐观并发版本");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("int")
+                        .HasColumnName("schema_version")
+                        .HasComment("规范化载荷版本");
+
+                    b.Property<string>("SourceAudience")
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("source_audience")
+                        .HasComment("已验证 Google Push Audience");
+
+                    b.Property<string>("SourcePrincipal")
+                        .IsRequired()
+                        .HasColumnType("varchar(255)")
+                        .HasColumnName("source_principal")
+                        .HasComment("已验证平台主体摘要");
+
+                    b.Property<DateTimeOffset>("SourceVerifiedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("source_verified_at")
+                        .HasComment("来源验证时间");
+
+                    b.Property<int>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("status")
+                        .HasComment("收件处理状态");
+
+                    b.Property<int>("Store")
+                        .HasColumnType("int")
+                        .HasColumnName("store")
+                        .HasComment("通知来源商店");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("updated_at")
+                        .HasComment("更新时间");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status", "LeaseExpiresAt");
+
+                    b.HasIndex("Status", "NextRetryAt");
+
+                    b.HasIndex("Store", "ExternalNotificationId");
+
+                    b.ToTable("store_notification_receipts", (string)null);
+                });
+
+            modelBuilder.Entity("Bumpic.Domain.AggregateModel.StoreProductAggregate.StoreProduct", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id")
+                        .HasComment("商店商品唯一标识");
+
+                    b.Property<decimal>("Amount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("decimal(18,4)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("amount")
+                        .HasComment("商品展示和配置金额");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
+                        .HasComment("商品记录创建时间");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(3)")
+                        .HasDefaultValue("")
+                        .HasColumnName("currency_code")
+                        .HasComment("ISO 4217 商品金额币种代码");
+
+                    b.Property<bool>("Deleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false)
+                        .HasColumnName("deleted")
+                        .HasComment("软删除标记");
+
+                    b.Property<bool>("Enabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false)
+                        .HasColumnName("enabled")
+                        .HasComment("是否允许客户端查询和购买");
+
+                    b.Property<int>("Points")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("points")
+                        .HasComment("验单成功后增加的固定点数");
+
+                    b.Property<string>("ProductId")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("varchar(255)")
+                        .HasDefaultValue("")
+                        .HasColumnName("product_id")
+                        .HasComment("商店后台配置的商品标识");
+
+                    b.Property<int>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("row_version")
+                        .HasComment("乐观并发控制版本");
+
+                    b.Property<int>("SortOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("sort_order")
+                        .HasComment("同一商店内的展示顺序");
+
+                    b.Property<int>("Store")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("store")
+                        .HasComment("商品所属商店");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
+                        .HasComment("商品记录最近更新时间");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Store", "ProductId");
+
+                    b.ToTable("store_products", (string)null);
+                });
+
+            modelBuilder.Entity("Bumpic.Domain.AggregateModel.StoreTransactionAggregate.StoreTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id")
+                        .HasComment("商店交易唯一标识");
+
+                    b.Property<decimal?>("Amount")
+                        .HasColumnType("decimal(18,4)")
+                        .HasColumnName("amount")
+                        .HasComment("权威验单金额快照");
+
+                    b.Property<int>("ConsumptionAttemptCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("consumption_attempt_count")
+                        .HasComment("Google 消费尝试次数");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
+                        .HasComment("交易记录创建时间");
+
+                    b.Property<string>("CurrencyCode")
+                        .HasColumnType("char(3)")
+                        .HasColumnName("currency_code")
+                        .HasComment("权威验单币种快照");
+
+                    b.Property<bool>("Deleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false)
+                        .HasColumnName("deleted")
+                        .HasComment("软删除标记");
+
+                    b.Property<string>("ExternalTransactionId")
+                        .IsRequired()
+                        .HasColumnType("varchar(1000)")
+                        .HasColumnName("external_transaction_id")
+                        .HasComment("平台原始交易标识；Apple transactionId 或 Google purchaseToken，仅含 ASCII 字符");
+
+                    MySqlPropertyBuilderExtensions.HasCharSet(b.Property<string>("ExternalTransactionId"), "ascii");
+
+                    b.Property<string>("FailureCode")
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("failure_code")
+                        .HasComment("稳定失败原因");
+
+                    b.Property<int>("GrantedPoints")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("granted_points")
+                        .HasComment("历史实际发放点数");
+
+                    b.Property<bool>("IsTestPurchase")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_test_purchase")
+                        .HasComment("是否为 Google 测试购买");
+
+                    b.Property<int?>("LastAppleFactPriority")
+                        .HasColumnType("int")
+                        .HasColumnName("last_apple_fact_priority")
+                        .HasComment("Apple 同一快照时间下的最新事实优先级");
+
+                    b.Property<DateTimeOffset?>("LastPlatformVersionAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("last_platform_version_at")
+                        .HasComment("最新平台快照版本时间");
+
+                    b.Property<DateTimeOffset?>("NextRetryAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("next_retry_at")
+                        .HasComment("下一次补偿时间");
+
+                    b.Property<int>("OwnershipStatus")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("ownership_status")
+                        .HasComment("交易账户归属状态");
+
+                    b.Property<int>("PointsSnapshot")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("points_snapshot")
+                        .HasComment("商品点数配置快照");
+
+                    b.Property<string>("ProductId")
+                        .HasColumnType("varchar(255)")
+                        .HasColumnName("product_id")
+                        .HasComment("商店商品标识快照");
+
+                    b.Property<DateTimeOffset?>("PurchasedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("purchased_at")
+                        .HasComment("商店确认购买时间");
+
+                    b.Property<DateTimeOffset?>("RefundedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("refunded_at")
+                        .HasComment("商店确认退款时间");
+
+                    b.Property<int>("ReversedPoints")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("reversed_points")
+                        .HasComment("当前累计冲正点数");
+
+                    b.Property<int>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("row_version")
+                        .HasComment("乐观并发控制版本");
+
+                    b.Property<int>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("status")
+                        .HasComment("商店交易状态");
+
+                    b.Property<int>("Store")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("store")
+                        .HasComment("交易来源商店");
+
+                    b.Property<Guid?>("StoreProductId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("store_product_id")
+                        .HasComment("服务端商品标识");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
+                        .HasComment("交易记录最近更新时间");
+
+                    b.Property<Guid?>("UserAccountId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("user_account_id")
+                        .HasComment("获得点数的用户账户标识");
+
+                    b.Property<string>("VerificationPayloadHash")
+                        .HasColumnType("varchar(128)")
+                        .HasColumnName("verification_payload_hash")
+                        .HasComment("验单证据摘要");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserAccountId");
+
+                    b.HasIndex("Status", "NextRetryAt");
+
+                    b.HasIndex("Store", "ExternalTransactionId");
+
+                    b.ToTable("store_transactions", (string)null);
+                });
+
+            modelBuilder.Entity("Bumpic.Domain.AggregateModel.StoreTransactionFactAggregate.StoreTransactionFact", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id")
+                        .HasComment("交易事实标识");
+
+                    b.Property<DateTimeOffset?>("AppliedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("applied_at")
+                        .HasComment("事实应用时间");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at")
+                        .HasComment("创建时间");
+
+                    b.Property<bool>("Deleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false)
+                        .HasColumnName("deleted")
+                        .HasComment("软删除标记");
+
+                    b.Property<string>("ExternalEventId")
+                        .IsRequired()
+                        .HasColumnType("varchar(512)")
+                        .HasColumnName("external_event_id")
+                        .HasComment("来源事件或快照稳定标识");
+
+                    b.Property<string>("ExternalTransactionId")
+                        .IsRequired()
+                        .HasColumnType("varchar(1000)")
+                        .HasColumnName("external_transaction_id")
+                        .HasComment("平台原始交易标识；Apple transactionId 或 Google purchaseToken，仅含 ASCII 字符");
+
+                    MySqlPropertyBuilderExtensions.HasCharSet(b.Property<string>("ExternalTransactionId"), "ascii");
+
+                    b.Property<byte[]>("FactKey")
+                        .IsRequired()
+                        .HasColumnType("binary(32)")
+                        .HasColumnName("fact_key")
+                        .HasComment("确定性事实幂等键");
+
+                    b.Property<DateTimeOffset>("ObservedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("observed_at")
+                        .HasComment("服务端观察时间");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("occurred_at")
+                        .HasComment("业务事件发生时间");
+
+                    b.Property<byte[]>("PayloadHash")
+                        .IsRequired()
+                        .HasColumnType("binary(32)")
+                        .HasColumnName("payload_hash")
+                        .HasComment("权威事实载荷摘要");
+
+                    b.Property<DateTimeOffset?>("PlatformVersionAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("platform_version_at")
+                        .HasComment("平台快照版本时间");
+
+                    b.Property<int>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("row_version")
+                        .HasComment("乐观并发版本");
+
+                    b.Property<int>("SourceType")
+                        .HasColumnType("int")
+                        .HasColumnName("source_type")
+                        .HasComment("交易事实来源");
+
+                    b.Property<int>("Store")
+                        .HasColumnType("int")
+                        .HasColumnName("store")
+                        .HasComment("交易来源商店");
+
+                    b.Property<Guid?>("StoreNotificationReceiptId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("store_notification_receipt_id")
+                        .HasComment("来源通知收件记录标识");
+
+                    b.Property<string>("StoreOrderId")
+                        .HasColumnType("varchar(255)")
+                        .HasColumnName("store_order_id")
+                        .HasComment("商店订单标识审计快照");
+
+                    MySqlPropertyBuilderExtensions.HasCharSet(b.Property<string>("StoreOrderId"), "ascii");
+
+                    b.Property<Guid?>("StoreTransactionId")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("store_transaction_id")
+                        .HasComment("已应用的内部交易标识");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int")
+                        .HasColumnName("type")
+                        .HasComment("交易事实类型");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("updated_at")
+                        .HasComment("更新时间");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StoreNotificationReceiptId");
+
+                    b.HasIndex("Store", "ExternalEventId");
+
+                    b.HasIndex("Store", "FactKey");
+
+                    b.HasIndex("Store", "ExternalTransactionId", "PlatformVersionAt");
+
+                    b.ToTable("store_transaction_facts", (string)null);
+                });
+
+            modelBuilder.Entity("Bumpic.Domain.AggregateModel.UserAccountAggregate.UserAccount", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id")
+                        .HasComment("用户账户唯一标识");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
+                        .HasComment("账户创建时间");
+
+                    b.Property<bool>("Deleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false)
+                        .HasColumnName("deleted")
+                        .HasComment("软删除标记");
+
+                    b.Property<DateTimeOffset>("DeletedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("deleted_at")
+                        .HasComment("账户删除时间");
+
+                    b.Property<DateTimeOffset?>("DeletionRequestedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("deletion_requested_at")
+                        .HasComment("注销申请时间；定时任务据此扫描到期账户");
+
+                    b.Property<string>("EmailAddress")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("varchar(320)")
+                        .HasDefaultValue("")
+                        .HasColumnName("email_address")
+                        .HasComment("规范化后的登录邮箱");
+
+                    b.Property<int>("FailedLoginCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("failed_login_count")
+                        .HasComment("连续登录失败次数");
+
+                    b.Property<string>("InvitationCode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("varchar(64)")
+                        .HasDefaultValue("")
+                        .HasColumnName("invitation_code")
+                        .HasComment("长期有效的邀请码");
+
+                    b.Property<DateTimeOffset?>("LastLoginAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("last_login_at")
+                        .HasComment("最近一次成功登录时间");
+
+                    b.Property<DateTimeOffset>("LockedUntil")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("locked_until")
+                        .HasComment("安全锁定截止时间");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("varchar(512)")
+                        .HasDefaultValue("")
+                        .HasColumnName("password_hash")
+                        .HasComment("安全哈希后的登录密码");
+
+                    b.Property<Guid>("PurchaseAccountToken")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("purchase_account_token")
+                        .HasComment("商店购买账户标识");
+
+                    b.Property<int>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("row_version")
+                        .HasComment("乐观并发控制版本");
+
+                    b.Property<int>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("status")
+                        .HasComment("用户账户状态");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
+                        .HasComment("账户最近更新时间");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PurchaseAccountToken");
+
+                    b.ToTable("user_accounts", (string)null);
+                });
+
+            modelBuilder.Entity("Bumpic.Domain.AggregateModel.UserAccountAggregate.UserExternalIdentity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("char(36)")
+                        .HasColumnName("id")
+                        .HasComment("外部身份唯一标识");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
+                        .HasComment("身份绑定时间");
+
+                    b.Property<bool>("Deleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint(1)")
+                        .HasDefaultValue(false)
+                        .HasColumnName("deleted")
+                        .HasComment("软删除标记");
+
+                    b.Property<int>("Provider")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("provider")
+                        .HasComment("外部身份提供方");
+
+                    b.Property<string>("RevocationTokenCiphertext")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("varchar(2048)")
+                        .HasDefaultValue("")
+                        .HasColumnName("revocation_token_ciphertext")
+                        .HasComment("加密后的平台撤销令牌，账户注销撤销成功后清空；禁止写入日志");
+
+                    b.Property<int>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0)
+                        .HasColumnName("row_version")
+                        .HasComment("乐观并发控制版本");
+
+                    b.Property<string>("SubjectId")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("varchar(255)")
+                        .HasDefaultValue("")
+                        .HasColumnName("subject_id")
+                        .HasComment("提供方返回的稳定用户标识");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP(6)")
+                        .HasComment("身份最近更新时间");
+
+                    b.Property<Guid>("UserAccountId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("char(36)")
+                        .HasDefaultValue(new Guid("00000000-0000-0000-0000-000000000000"))
+                        .HasColumnName("user_account_id")
+                        .HasComment("逻辑关联的用户账户标识");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("user_external_identities", (string)null);
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("FriendlyName")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("Xml")
+                        .HasColumnType("longtext");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DataProtectionKeys");
+                });
 
             modelBuilder.Entity("NetCorePal.Extensions.DistributedTransactions.CAP.Persistence.CapLock", b =>
                 {
