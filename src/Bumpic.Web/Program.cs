@@ -9,6 +9,9 @@ using FluentValidation.AspNetCore;
 using Bumpic.Web.Clients;
 using Bumpic.Web.Extensions;
 using Bumpic.Web.Options;
+using Bumpic.Web.Services.EmailCodes;
+using Bumpic.Web.Services.ExternalIdentities;
+using Bumpic.Web.Services.SessionTokens;
 using Bumpic.Web.Utils;
 using FastEndpoints;
 using FastEndpoints.Swagger;
@@ -184,6 +187,33 @@ try
         });
 
     builder.Services.AddLoginUser();
+    builder.Services.AddSingleton<SessionTokenIssuer>();
+    builder.Services.Configure<EmailCodeOptions>(builder.Configuration.GetSection("EmailCode"));
+    builder.Services.Configure<ForPublishEmailOption>(builder.Configuration.GetSection("ForPublishEmail"));
+    builder.Services.Configure<EmailSenderOptions>(builder.Configuration.GetSection("Email"));
+    builder.Services.AddSingleton<IEmailCodeSender, SmtpEmailCodeSender>();
+    builder.Services.AddSingleton<IEmailCodeStore, RedisEmailCodeStore>();
+    builder.Services.AddSingleton<IEmailCodeService, EmailCodeService>();
+    builder.Services.AddSingleton<IValidateOptions<AccountDeletionOptions>, AccountDeletionOptionsValidator>();
+    builder.Services.AddOptions<AccountDeletionOptions>().Bind(builder.Configuration.GetSection("AccountDeletion")).ValidateOnStart();
+    builder.Services.AddMemoryCache();
+    builder.Services.Configure<AppleExternalIdentityOptions>(builder.Configuration.GetSection("ExternalIdentity:Apple"));
+    builder.Services.Configure<GoogleExternalIdentityOptions>(builder.Configuration.GetSection("ExternalIdentity:Google"));
+    var appleAuthBaseUrl = builder.Configuration.GetValue<string>("ExternalIdentity:Apple:BaseUrl") ?? "https://appleid.apple.com";
+    var googleAuthBaseUrl = builder.Configuration.GetValue<string>("ExternalIdentity:Google:BaseUrl") ?? "https://www.googleapis.com";
+    builder.Services.AddRefitClient<IAppleAuthClient>()
+        .ConfigureHttpClient(client => client.BaseAddress = new Uri(appleAuthBaseUrl));
+    builder.Services.AddRefitClient<IGoogleAuthClient>()
+        .ConfigureHttpClient(client => client.BaseAddress = new Uri(googleAuthBaseUrl));
+    builder.Services.AddTransient<PlatformJwksProvider>();
+    builder.Services.AddTransient<AppleExternalIdentityVerifier>();
+    builder.Services.AddTransient<GoogleExternalIdentityVerifier>();
+    builder.Services.AddHttpClient(ExternalIdentityRevocationService.AppleHttpClientName,
+        client => client.BaseAddress = new Uri(appleAuthBaseUrl));
+    builder.Services.AddHttpClient(ExternalIdentityRevocationService.GoogleOAuthHttpClientName,
+        client => client.BaseAddress = new Uri(builder.Configuration.GetValue<string>("ExternalIdentity:Google:OAuthBaseUrl") ?? "https://oauth2.googleapis.com"));
+    builder.Services.AddSingleton<IRevocationTokenProtector, RevocationTokenProtector>();
+    builder.Services.AddScoped<IExternalIdentityRevocationService, ExternalIdentityRevocationService>();
     #endregion
 
 
