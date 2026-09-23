@@ -1,0 +1,641 @@
+--- a/Directory.Packages.props
++++ b/Directory.Packages.props
+@@ -15,7 +15,9 @@
+   </PropertyGroup>
+ 
+   <ItemGroup>
++    <PackageVersion Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" Version="9.0.0" />
+     <PackageVersion Include="Microsoft.AspNetCore.DataProtection.StackExchangeRedis" Version="10.0.0" />
++    <PackageVersion Include="Microsoft.AspNetCore.OutputCaching.StackExchangeRedis" Version="10.0.0" />
+     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.1" />
+     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="9.0.0" />
+     <PackageVersion Include="AspNet.Security.OAuth.Feishu" Version="9.0.0" />
+@@ -148,5 +150,15 @@
+ 
+     <!-- Code analysis -->
+     <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.3.0.106239" />
++
++    <!--jwt -->
++    <PackageVersion Include="jwt" Version="10.0.2" />
++    <!--yarp -->
++    <PackageVersion Include="Yarp.ReverseProxy" Version="2.3.0" />
++    <!-- AI -->
++    <PackageVersion Include="OpenAI" Version="2.9.0" />
++    <PackageVersion Include="Azure.AI.OpenAI" Version="2.9.0-beta.1" />
++    <PackageVersion Include="Azure.AI.Projects" Version="2.1.0-beta.3" />
++    <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.11.1" />
+   </ItemGroup>
+ </Project>
+--- a/src/__PROJECT_NAME__.Domain/__PROJECT_NAME__.Domain.csproj
++++ b/src/__PROJECT_NAME__.Domain/__PROJECT_NAME__.Domain.csproj
+@@ -17,5 +17,9 @@
+       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+     </PackageReference>
+   </ItemGroup>
++  <ItemGroup>
++    <Folder Include="AggregateModel\" />
++    <Folder Include="DomainEvents\" />
++  </ItemGroup>
+ 
+ </Project>
+--- a/src/__PROJECT_NAME__.Infrastructure/ApplicationDbContext.cs
++++ b/src/__PROJECT_NAME__.Infrastructure/ApplicationDbContext.cs
+@@ -1,13 +1,17 @@
+ using MediatR;
++using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
+ using Microsoft.EntityFrameworkCore;
+ using NetCorePal.Extensions.DistributedTransactions.CAP.Persistence;
+ 
+ namespace __PROJECT_NAME__.Infrastructure;
+ 
+ public partial class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, IMediator mediator)
+-    : AppDbContextBase(options, mediator)
++    : AppDbContextBase(options, mediator),IDataProtectionKeyContext
+     , IMySqlCapDataStorage
+ {
++    
++    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
++    
+     protected override void OnModelCreating(ModelBuilder modelBuilder)
+     {
+         if (modelBuilder is null)
+--- a/src/__PROJECT_NAME__.Infrastructure/__PROJECT_NAME__.Infrastructure.csproj
++++ b/src/__PROJECT_NAME__.Infrastructure/__PROJECT_NAME__.Infrastructure.csproj
+@@ -7,6 +7,7 @@
+     </PropertyGroup>
+ 
+     <ItemGroup>
++        <PackageReference Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" />
+         <PackageReference Include="Microsoft.EntityFrameworkCore.Design"/>
+         <PackageReference Include="Microting.EntityFrameworkCore.MySql"/>
+         <PackageReference Include="Microting.EntityFrameworkCore.MySql.Json.Microsoft"/>
+--- a/src/__PROJECT_NAME__.Web/__PROJECT_NAME__.Web.csproj
++++ b/src/__PROJECT_NAME__.Web/__PROJECT_NAME__.Web.csproj
+@@ -7,6 +7,7 @@
+     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+     <DockerfileContext>..\..</DockerfileContext>
+     <GenerateDocumentationFile>true</GenerateDocumentationFile>
++    <UserSecretsId>ef55b182-0ba8-4b26-b91f-43eb67daaf51</UserSecretsId>
+   </PropertyGroup>
+   <ItemGroup>
+     <PackageReference Include="AspNet.Security.OAuth.Feishu" />
+@@ -19,7 +20,9 @@
+     <PackageReference Include="FluentValidation.AspNetCore" />
+     <PackageReference Include="Hangfire.AspNetCore" />
+     <PackageReference Include="Hangfire.Redis.StackExchange" />
++    <PackageReference Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" />
+     <PackageReference Include="Microsoft.AspNetCore.DataProtection.StackExchangeRedis" />
++    <PackageReference Include="Microsoft.AspNetCore.OutputCaching.StackExchangeRedis" />
+     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+       <PrivateAssets>all</PrivateAssets>
+       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+@@ -46,6 +49,13 @@
+     <PackageReference Include="Serilog.Sinks.OpenTelemetry" />
+     <PackageReference Include="StackExchange.Redis" />
+     <PackageReference Include="Swashbuckle.AspNetCore" />
++
++    <PackageReference Include="Yarp.ReverseProxy" />
++    <PackageReference Include="jwt" />
++
++    <!-- AI Agent-->
++    <PackageReference Include="Azure.AI.OpenAI" />
++    <PackageReference Include="Microsoft.Agents.AI.OpenAI" />
+   </ItemGroup>
+ 
+   <ItemGroup>
+@@ -62,6 +72,14 @@
+   </ItemGroup>
+ 
+   <ItemGroup>
++    <Folder Include="Application\Commands\" />
++    <Folder Include="Application\DomainEventHandlers\" />
++    <Folder Include="Application\IntegrationEventHandlers\" />
++    <Folder Include="Application\IntegrationEventConverters\" />
++    <Folder Include="Application\IntegrationEvents\" />
++    <Folder Include="Application\Jobs\" />
++    <Folder Include="Application\Queries\" />
++    <Folder Include="Application\Vos\" />
+     <Folder Include="wwwroot\" />
+   </ItemGroup>
+ 
+--- a/src/__PROJECT_NAME__.Web/Program.cs
++++ b/src/__PROJECT_NAME__.Web/Program.cs
+@@ -8,17 +8,25 @@
+ using FluentValidation.AspNetCore;
+ using __PROJECT_NAME__.Web.Clients;
+ using __PROJECT_NAME__.Web.Extensions;
++using __PROJECT_NAME__.Web.Options;
+ using __PROJECT_NAME__.Web.Utils;
+ using FastEndpoints;
++using FastEndpoints.Swagger;
+ using Serilog;
+ using Serilog.Formatting.Json;
+ using Hangfire;
+ using Hangfire.Redis.StackExchange;
++using Microsoft.AspNetCore.Authentication.JwtBearer;
+ using Microsoft.AspNetCore.Http.Json;
++using Microsoft.IdentityModel.Tokens;
++using NetCorePal.Context;
+ using Newtonsoft.Json;
+ using Newtonsoft.Json.Serialization;
+ using Refit;
+ using NetCorePal.Extensions.CodeAnalysis;
++using NetCorePal.Extensions.MultiEnv;
++using Serilog.Events;
++using Serilog.Formatting.Compact;
+ 
+ Log.Logger = new LoggerConfiguration()
+     .Enrich.WithClientIp()
+@@ -27,7 +35,62 @@
+ try
+ {
+     var builder = WebApplication.CreateBuilder(args);
+-    builder.Host.UseSerilog();
++    builder.Configuration.AddJsonFile("/app/appconfig.json", optional: true);
++    builder.Services.Configure<AppOptions>(builder.Configuration.GetSection("App"));
++    var appOptions = new AppOptions();
++    builder.Configuration.GetSection("App").Bind(appOptions);
++    
++    
++    #region Serilog
++
++    
++    if (!builder.Environment.IsDevelopment())
++    {
++        builder.Logging.ClearProviders();
++        builder.Host.UseSerilog((context, services, configuration) =>
++            {
++                configuration
++                    .ReadFrom.Configuration(context.Configuration)
++                    .Enrich.FromLogContext()
++                    .Enrich.WithClientIp()
++                    .MinimumLevel.Override(
++                        source: "Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddleware",
++                        LogEventLevel.Fatal
++                    )
++                    .WriteTo.Console(new CompactJsonFormatter());
++                configuration
++                    .MinimumLevel.Override("Microsoft", LogEventLevel.Error);
++            },
++            writeToProviders: true);
++    }
++
++    #endregion
++    
++    #region Config
++    
++    var jwtConfig = new JwtConfig();
++    builder.Services.Configure<JwtConfig>(builder.Configuration.GetSection("Jwt"));
++    builder.Configuration.GetSection("Jwt").Bind(jwtConfig);
++    builder.Services.AddSingleton<JwtGenerator>();
++    
++    RedisOptions redisOptions = new();
++
++    builder.Configuration.GetSection("Redis").Bind(redisOptions);
++    var co = new ConfigurationOptions();
++    co.EndPoints.Add(redisOptions.Host, redisOptions.Port);
++    co.DefaultDatabase = redisOptions.Database;
++    co.Password = redisOptions.Password;
++    var redis = await ConnectionMultiplexer.ConnectAsync(co);
++    builder.Services.AddSingleton<IConnectionMultiplexer>(_ => redis);
++    
++    var envOption = new EnvOptions();
++    builder.Configuration.GetSection("Env").Bind(envOption);
++    var displayEnv = string.IsNullOrEmpty(envOption.ServiceEnv) ? "main" : envOption.ServiceEnv;
++
++    var hangfireJobConfiguration = builder.Configuration.GetSection("HangfireJob");
++    builder.Services.AddOptions<HangfireJobOptions>().Bind(hangfireJobConfiguration).ValidateOnStart();
++    
++    #endregion
+ 
+     #region SignalR
+ 
+@@ -35,6 +98,7 @@
+     builder.Services.AddMvc()
+         .AddNewtonsoftJson(options => { options.SerializerSettings.AddNetCorePalJsonConverters(); });
+     builder.Services.AddSignalR();
++    
+ 
+     #endregion
+ 
+@@ -49,45 +113,124 @@
+     // Add services to the container.
+ 
+     #region 身份认证
+-
+-    var redis = await ConnectionMultiplexer.ConnectAsync(builder.Configuration.GetConnectionString("Redis")!);
+-    builder.Services.AddSingleton<IConnectionMultiplexer>(_ => redis);
+     
+     // DataProtection - use custom extension that resolves IConnectionMultiplexer from DI
+     builder.Services.AddDataProtection()
+-        .PersistKeysToStackExchangeRedis("DataProtection-Keys");
+-
+-      // 配置JWT认证
+-   builder.Services.Configure<AppConfiguration>(builder.Configuration.GetSection("AppConfiguration"));
+-   var appConfig = builder.Configuration.GetSection("AppConfiguration").Get<AppConfiguration>() ?? new AppConfiguration { JwtIssuer = "netcorepal", JwtAudience = "netcorepal" };
+-   
+-   builder.Services.AddAuthentication().AddJwtBearer(options =>
+-   {
+-       options.RequireHttpsMetadata = false;
+-       options.TokenValidationParameters.ValidAudience = appConfig.JwtAudience;
+-       options.TokenValidationParameters.ValidateAudience = true;
+-       options.TokenValidationParameters.ValidIssuer = appConfig.JwtIssuer;
+-       options.TokenValidationParameters.ValidateIssuer = true;
+-   });
+-    builder.Services.AddNetCorePalJwt().AddRedisStore();
+-
++        .PersistKeysToDbContext<ApplicationDbContext>();
++    JsonWebKeysOptions certsOptions = new();
++    builder.Configuration.Bind(certsOptions);
++    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
++        .AddCookie()
++        .AddJwtBearer(jwtBearerOptions =>
++        {
++            jwtBearerOptions.MapInboundClaims = false;
++            jwtBearerOptions.TokenValidationParameters = new TokenValidationParameters
++            {
++                ValidateAudience = false,
++                ValidateIssuer = false,
++                ValidateLifetime = true,
++                ValidateIssuerSigningKey = true,
++                TryAllIssuerSigningKeys = true,
++                ValidAudience = jwtConfig.Audience,
++                ValidIssuer = jwtConfig.Issuer,
++            };
++            jwtBearerOptions.Events = new JwtBearerEvents
++            {
++                OnMessageReceived = context =>
++                {
++                    var accessToken = context.Request.Query["access_token"];
++                    // If the request is for our hub...
++                    var path = context.HttpContext.Request.Path;
++                    if (!string.IsNullOrEmpty(accessToken) &&
++                        (path.StartsWithSegments("/hubs/notify")
++                         ||
++                         path.StartsWithSegments("/mapteam")))
++                    {
++                        // Read the token out of the query string
++                        context.Token = accessToken;
++                    }
++
++                    return Task.CompletedTask;
++                }
++            };
++        });
++
++    // 添加Redis连接
++    builder.Services.AddNetCorePalJwt().AddRedisStore(); // 使用Redis存储密钥
++
++    builder.Services.AddAuthorizationBuilder()
++        .AddPolicy(PolicyNames.Client, policy =>
++        {
++            policy.RequireAuthenticatedUser();
++            policy.RequireClaim("type", TokenType.Client);
++            policy.AuthenticationSchemes.Add(JwtBearerDefaults.AuthenticationScheme);
++        })
++        .AddPolicy(PolicyNames.Admin, policy =>
++        {
++            policy.RequireAuthenticatedUser();
++            policy.RequireClaim("type", TokenType.Admin);
++            policy.AuthenticationSchemes.Add(JwtBearerDefaults.AuthenticationScheme);
++        }).AddPolicy(PolicyNames.AdminOnly, policy =>
++        {
++            policy.RequireAuthenticatedUser();
++            policy.RequireClaim("type", TokenType.Admin);
++            policy.RequireRole("admin");
++            policy.AuthenticationSchemes.Add(JwtBearerDefaults.AuthenticationScheme);
++        }).AddPolicy(PolicyNames.RefreshToken, policy =>
++        {
++            policy.RequireAuthenticatedUser();
++            policy.RequireClaim("refresh-token", "true");
++            policy.AuthenticationSchemes.Add(JwtBearerDefaults.AuthenticationScheme);
++        });
++
++    builder.Services.AddLoginUser();
+     #endregion
+ 
+ 
+     #region Controller
+ 
+     builder.Services.AddControllers().AddNetCorePalSystemTextJson();
+-    // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+-    builder.Services.AddEndpointsApiExplorer();
+-    builder.Services.AddSwaggerGen(c => c.AddEntityIdSchemaMap()); //强类型id swagger schema 映射
+-
++    if (appOptions.EnableSwagger)
++    {
++        builder.Services.AddEndpointsApiExplorer();
++        builder.Services.AddSwaggerGen(c => c.AddEntityIdSchemaMap()); //强类型id swagger schema 映射
++    }
+     #endregion
+ 
+     #region FastEndpoints
+ 
+-    builder.Services.AddFastEndpoints(o => o.IncludeAbstractValidators = true);
++    builder.Services.AddFastEndpoints(o => { o.IncludeAbstractValidators = true; });
+     builder.Services.Configure<JsonOptions>(o =>
+         o.SerializerOptions.AddNetCorePalJsonConverters());
++    //缓存
++    builder.Services.AddResponseCaching();
++    builder.Services.AddStackExchangeRedisOutputCache(options =>
++    {
++        options.Configuration =
++            $"{redisOptions.Host}:{redisOptions.Port},password={redisOptions.Password},defaultDatabase={redisOptions.Database}";
++    });
++    if (appOptions.EnableSwagger)
++    {
++        builder.Services.SwaggerDocument(o =>
++        {
++            o.DocumentSettings = s =>
++            {
++                s.Version = "v1"; //must match what's being passed in to the map method below
++                s.Title = $"{appOptions.Name} [env={displayEnv}]";
++            };
++            //自动Tag路径
++            o.AutoTagPathSegmentIndex = 0;
++        });
++    }
++    #endregion
++    
++    
++    #region 公共服务
++
++    builder.Services.AddSingleton<IClock, SystemClock>();
++    builder.Services.AddHttpContextAccessor();
++    builder.Services.AddRequestCancellationToken();
++    builder.Services.AddRequestTimeouts();
+ 
+     #endregion
+ 
+@@ -98,6 +241,30 @@
+     builder.Services.AddKnownExceptionErrorModelInterceptor();
+ 
+     #endregion
++    
++    
++    
++    #region Query
++
++    builder.Services.AddAllQueries();
++
++    #endregion
++
++    
++    #region RabbitMQ
++
++    builder.Services.AddRabbitMQ(builder.Configuration.GetSection("RabbitMQ"));
++
++    #endregion
++    
++    
++    #region 服务注册发现
++
++    builder.Services.AddAllContext();
++    builder.Services.AddNetCorePalServiceDiscoveryClient();
++    builder.Services.Configure<EnvOptions>(builder.Configuration.GetSection("Env"));
++
++    #endregion
+ 
+ 
+     #region 基础设施
+@@ -107,8 +274,14 @@
+     builder.Services.AddDbContext<ApplicationDbContext>(options =>
+     {
+         options.UseMySql(builder.Configuration.GetConnectionString("MySql"),
+-            new MySqlServerVersion(new Version(8, 0, 34)));
+-        // 仅在开发环境启用敏感数据日志，防止生产环境泄露敏感信息
++            new MySqlServerVersion(new Version(5, 7, 30)),
++            b =>
++            {
++                b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName);
++                b.UseMicrosoftJson();
++            });
++        options.LogTo(Console.WriteLine, LogLevel.Information)
++            .EnableDetailedErrors();
+         if (builder.Environment.IsDevelopment())
+         {
+             options.EnableSensitiveDataLogging();
+@@ -127,16 +300,37 @@
+         });
+ 
+ 
++    //配置多环境Options
++    builder.Services.Configure<EnvOptions>(envOptions => builder.Configuration.GetSection("Env").Bind(envOptions));
++    builder.Services.AddContext().AddEnvContext().AddCapContextProcessor();
++    var rabbitMqOptions = new RabbitMQOptions();
++    var rabbitmqSection = builder.Configuration.GetSection("RabbitMQ");
++    rabbitmqSection.Bind(rabbitMqOptions);
+     builder.Services.AddCap(x =>
+     {
++        x.TopicNamePrefix = "bumpic";
++        x.DefaultGroupName = appOptions.Name;
++        x.Version = displayEnv;
++        x.FailedRetryCount = 3;
+         x.UseNetCorePalStorage<ApplicationDbContext>();
+-        x.JsonSerializerOptions.AddNetCorePalJsonConverters();
+-        x.ConsumerThreadCount = Environment.ProcessorCount;
+-        x.UseRabbitMQ(p => builder.Configuration.GetSection("RabbitMQ").Bind(p));
+-        x.UseDashboard(); //CAP Dashboard  path：  /cap
+-    });
+-
+-    #endregion
++        x.UseRabbitMQ(p =>
++        {
++            p.HostName = rabbitMqOptions.HostName;
++            p.UserName = rabbitMqOptions.Username;
++            p.Password = rabbitMqOptions.Password;
++            p.Port = rabbitMqOptions.Port;
++            p.VirtualHost = rabbitMqOptions.VirtualHost;
++            p.ExchangeName = "bumpic";
++        });
++        x.UseDashboard(options =>
++        {
++            options.PathMatch = $"/{appOptions.DashBoardPathPrefix}/cap";
++        }); //CAP Dashboard  path：  /cap
++    });
++
++    #endregion
++    
++    builder.Services.AddCommandLocks(Assembly.GetExecutingAssembly());
+ 
+     builder.Services.AddMediatR(cfg =>
+         cfg.RegisterServicesFromAssemblies(Assembly.GetExecutingAssembly())
+@@ -168,13 +362,50 @@
+             client.BaseAddress = new Uri(builder.Configuration.GetValue<string>("https+http://user:8080")!))
+         .AddMultiEnvMicrosoftServiceDiscovery() //多环境服务发现支持
+         .AddStandardResilienceHandler(); //添加标准的重试策略
+-
++    
++    builder.Services.AddClients();
+     #endregion
+ 
+     #region Jobs
+ 
+-    builder.Services.AddHangfire(x => { x.UseRedisStorage(builder.Configuration.GetConnectionString("Redis")); });
+-    builder.Services.AddHangfireServer(); //hangfire dashboard  path：  /hangfire
++    builder.Services.AddJobs();
++    builder.Services.AddHangfire(x =>
++    {
++        var hangfireRedis = builder.Configuration.GetConnectionString("hangfireRedis");
++        x.UseFilter(new AutomaticRetryAttribute { Attempts = 1 });
++        x.UseRedisStorage(!string.IsNullOrEmpty(hangfireRedis) ? ConnectionMultiplexer.Connect(hangfireRedis) : redis,
++            new RedisStorageOptions
++            {
++                Prefix = string.IsNullOrEmpty(envOption.ServiceEnv)
++                    ? "hangfire:__PROJECT_NAME__:"
++                    : $"hangfire:__PROJECT_NAME__-{envOption.ServiceEnv}:",
++                Db = !string.IsNullOrEmpty(hangfireRedis) ? 0 : redisOptions.Database
++            });
++    });
++    builder.Services.AddHangfireServer(option =>
++        option.SchedulePollingInterval = TimeSpan.FromSeconds(1)); //hangfire dashboard  path：  /hangfire
++
++    #endregion
++    
++    
++    #region Cros
++
++    builder.Services.AddCors(option =>
++    {
++        option.AddDefaultPolicy(policy =>
++        {
++            policy.AllowAnyOrigin()
++                .AllowAnyMethod()
++                .AllowAnyHeader();
++        });
++        option.AddPolicy("imageDownload",
++            policy =>
++            {
++                policy.AllowAnyOrigin()
++                    .AllowAnyMethod()
++                    .AllowAnyHeader();
++            });
++    });
+ 
+     #endregion
+ 
+@@ -186,10 +417,39 @@
+     {
+         using var scope = app.Services.CreateScope();
+         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+-        await dbContext.Database.MigrateAsync();
+-    }
+-
+-
++        // 测试等场景可通过配置改为按当前模型建库（EnsureCreated），
++        // 以便数据库包含全部 DbSet 对应的表而不依赖 Migration 文件。
++        if (string.Equals(app.Configuration["Database:InitializeMode"], "EnsureCreated", StringComparison.OrdinalIgnoreCase))
++        {
++            await dbContext.Database.EnsureCreatedAsync();
++        }
++        else
++        {
++            await dbContext.Database.MigrateAsync();
++        }
++    }
++    else
++    {
++        using var scope = app.Services.CreateScope();
++        if (appOptions.UseMigrateDatabase)
++        {
++            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
++            await dbContext.Database.MigrateAsync();
++        }
++    }
++
++    
++    app.UseForwardedHeaders();
++
++    app.UseContext();
++    app.Use(async (context, next) =>
++    {
++        var contextAccessor = context.RequestServices.GetRequiredService<IContextAccessor>();
++        contextAccessor.SetContext(new CultureContext(Thread.CurrentThread.CurrentCulture.Name));
++        await next(context);
++    });
++
++    app.UseAuthentication(); // Authentication 必须在 Authorization 之前
+     app.UseKnownExceptionHandler();
+     // Configure the HTTP request pipeline.
+     if (app.Environment.IsDevelopment())
+@@ -201,11 +461,23 @@
+     app.UseStaticFiles();
+     //app.UseHttpsRedirection();
+     app.UseRouting();
+-    app.UseAuthentication(); // Authentication 必须在 Authorization 之前
+     app.UseAuthorization();
+ 
+     app.MapControllers();
+     app.UseFastEndpoints();
++    
++    
++    if (appOptions.EnableSwagger)
++    {
++        app.UseSwaggerGen(
++            config: c => { c.Path = $"/{appOptions.DashBoardPathPrefix}/swagger/{{documentName}}/swagger.{{json|yaml}}"; },
++            uiConfig: u =>
++            {
++                u.Path = $"/{appOptions.DashBoardPathPrefix}/swagger";
++                u.DocumentPath =
++                    $"/{appOptions.DashBoardPathPrefix}/swagger/{{documentName}}/swagger.{{json|yaml}}";
++            });
++    }
+ 
+     #region SignalR
+ 
+@@ -227,7 +499,15 @@
+         return Results.Content(html, "text/html; charset=utf-8");
+     });
+     
+-    app.UseHangfireDashboard();
++    app.UseHangfireDashboard($"/{appOptions.DashBoardPathPrefix}/hangfire", new DashboardOptions()
++    {
++        Authorization = new[] { new HangfireNoAuthorizationFilter() }
++    });
++    
++    if (app.Configuration.GetValue("RegisterJobs", true))
++    {
++        app.RegisterJobs();
++    }
+     await app.RunAsync();
+ }
+ catch (Exception ex)
+
+--- a/src/__PROJECT_NAME__.Web/Extensions/StackExchangeRedisDataProtectionBuilderExtensions.cs
++++ b/src/__PROJECT_NAME__.Web/Extensions/StackExchangeRedisDataProtectionBuilderExtensions.cs
+@@ -1,7 +1,6 @@
+ using Microsoft.AspNetCore.DataProtection;
+ using Microsoft.AspNetCore.DataProtection.KeyManagement;
+ using Microsoft.AspNetCore.DataProtection.StackExchangeRedis;
+-using Microsoft.Extensions.DependencyInjection;
+ using Microsoft.Extensions.Options;
+ using StackExchange.Redis;
+ 
+--- a/src/__PROJECT_NAME__.Web/Extensions/SwaggerGenOptionsExtionsions.cs
++++ /dev/null
+@@ -1,25 +0,0 @@
+-using Microsoft.OpenApi.Models;
+-using Swashbuckle.AspNetCore.SwaggerGen;
+-
+-namespace __PROJECT_NAME__.Web.Extensions;
+-
+-public static class SwaggerGenOptionsExtionsions
+-{
+-    public static SwaggerGenOptions AddEntityIdSchemaMap(this SwaggerGenOptions swaggerGenOptions)
+-    {
+-        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies()
+-                     .Where(p => p.FullName != null && p.FullName.Contains("__PROJECT_NAME__")))
+-        {
+-            foreach (var type in assembly.GetTypes())
+-            {
+-                if (type.IsClass && Array.Exists(type.GetInterfaces(), p => p == typeof(IEntityId)))
+-                {
+-                    swaggerGenOptions.MapType(type,
+-                        () => new OpenApiSchema { Type = typeof(string).Name.ToLower() });
+-                }
+-            }
+-        }
+-
+-        return swaggerGenOptions;
+-    }
+-}

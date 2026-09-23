@@ -1,0 +1,66 @@
+<root>
+    <resheader name="resmimetype">
+        <value>text/microsoft-resx</value>
+    </resheader>
+    <resheader name="version">
+        <value>1.3</value>
+    </resheader>
+    <resheader name="reader">
+        <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+    </resheader>
+    <resheader name="writer">
+        <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+    </resheader>
+    <data name="emailTemplate" xml:space="preserve">
+        <value>&lt;!DOCTYPE html&gt;&lt;html lang="en"&gt;&lt;head&gt; &lt;meta charset="UTF-8"&gt; &lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt; &lt;title&gt;Watt Verification Email&lt;/title&gt;&lt;/head&gt;&lt;body style="font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f5f5f5;"&gt; &lt;div class="container" style="max-width: 600px; margin: 20px auto; background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 10px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);"&gt; &lt;div class="header" style="background-color: #0078d4; color: #ffffff; padding: 10px 20px; border-radius: 10px 10px 0 0; text-align: left;"&gt; &lt;p&gt;&lt;strong&gt;Watt&lt;/strong&gt;&lt;/p&gt; &lt;/div&gt; &lt;div class="content" style="padding: 20px 20px 10px 20px;"&gt; &lt;p&gt;&lt;strong&gt;Watt verification code&lt;/strong&gt;&lt;/p&gt; &lt;br/&gt; &lt;p&gt;Your verification code is &lt;span class="highlight" style="font-weight: bold; color: #0078d4;"&gt;${verify-code}&lt;/span&gt;. The code is valid for 10 minutes.&lt;/p&gt; &lt;br/&gt; &lt;/div&gt; &lt;div class="footer" style="font-size: 12px; color: #666666; padding: 5px 20px;"&gt; &lt;p&gt;This is an automated message. Please do not reply directly to this email.&lt;/p&gt; &lt;p&gt;Website: &lt;a href="http://www.interpaystellar.com" style="color: inherit; text-decoration: none;"&gt;www.interpaystellar.com&lt;/a&gt; Email: &lt;a href="mailto:contact@interpaystellar.com" style="color: inherit; text-decoration: none;"&gt;contact@interpaystellar.com&lt;/a&gt;&lt;/p&gt; &lt;/div&gt; &lt;/div&gt;&lt;/body&gt;&lt;/html&gt;
+</value>
+    </data>
+    <data name="admin user does not exist" xml:space="preserve">
+        <value>Admin user does not exist</value>
+    </data>
+    <data name="incorrect username or password" xml:space="preserve">
+        <value>Incorrect username or password</value>
+    </data>
+    <data name="credential could not be encoded" xml:space="preserve">
+        <value>Credential could not be encoded</value>
+    </data>
+    <data name="user password may have been changed" xml:space="preserve">
+        <value>User password may have been changed.Please login again</value>
+    </data>
+    <data name="verification code error or expired" xml:space="preserve">
+        <value>Verification code error or expired</value>
+    </data>
+    <data name="email to admin user created template" xml:space="preserve">
+        <value>You have become the administrator of platform WATT, with the website address ${host} , default login account as email address, and default password as ${password}. Wishing you a smooth work!</value>
+    </data>
+    <data name="email to operator created template" xml:space="preserve">
+        <value>You have become the operator of platform WATT, with the website address ${host} , default login account as email address, and default password as ${password}. Wishing you a smooth work!</value>
+    </data>
+    <data name="super administrator account cannot be deleted" xml:space="preserve">
+        <value>Super administrator account cannot be deleted</value>
+    </data>
+    <data name="super administrator account cannot be edited" xml:space="preserve">
+        <value>Super administrator account cannot be edited</value>
+    </data>
+    <data name="user does not have permission to operate" xml:space="preserve">
+        <value>You does not have permission to operate</value>
+    </data>
+    <data name="new email has been added" xml:space="preserve">
+        <value>The new email has been added</value>
+    </data>
+    <data name="email cannot be empty" xml:space="preserve">
+        <value>Email cannot be empty</value>
+    </data>
+    <data name="new password cannot be empty" xml:space="preserve">
+        <value>New password cannot be empty</value>
+    </data>
+    <data name="confirm new password cannot be empty" xml:space="preserve">
+        <value>Confirm new password cannot be empty</value>
+    </data>
+    <data name="new password and the confirmed password do not match" xml:space="preserve">
+        <value>The new password and the confirmed password do not match</value>
+    </data>
+    <data name="email is not valid" xml:space="preserve">
+        <value>Email is not valid</value>
+    </data>
+</root>

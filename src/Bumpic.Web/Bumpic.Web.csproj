@@ -7,6 +7,7 @@
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     <DockerfileContext>..\..</DockerfileContext>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <UserSecretsId>ef55b182-0ba8-4b26-b91f-43eb67daaf51</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="AspNet.Security.OAuth.Feishu" />
@@ -19,7 +20,9 @@
     <PackageReference Include="FluentValidation.AspNetCore" />
     <PackageReference Include="Hangfire.AspNetCore" />
     <PackageReference Include="Hangfire.Redis.StackExchange" />
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection.StackExchangeRedis" />
+    <PackageReference Include="Microsoft.AspNetCore.OutputCaching.StackExchangeRedis" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -46,6 +49,13 @@
     <PackageReference Include="Serilog.Sinks.OpenTelemetry" />
     <PackageReference Include="StackExchange.Redis" />
     <PackageReference Include="Swashbuckle.AspNetCore" />
+
+    <PackageReference Include="Yarp.ReverseProxy" />
+    <PackageReference Include="jwt" />
+
+    <!-- AI Agent-->
+    <PackageReference Include="Azure.AI.OpenAI" />
+    <PackageReference Include="Microsoft.Agents.AI.OpenAI" />
   </ItemGroup>
 
   <ItemGroup>
@@ -62,6 +72,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Application\Commands\" />
+    <Folder Include="Application\DomainEventHandlers\" />
+    <Folder Include="Application\IntegrationEventHandlers\" />
+    <Folder Include="Application\IntegrationEventConverters\" />
+    <Folder Include="Application\IntegrationEvents\" />
+    <Folder Include="Application\Jobs\" />
+    <Folder Include="Application\Queries\" />
+    <Folder Include="Application\Vos\" />
     <Folder Include="wwwroot\" />
   </ItemGroup>
 

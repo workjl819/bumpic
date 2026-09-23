@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<root>
+    <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+        <xsd:element name="root" msdata:IsDataSet="true">
+            
+        </xsd:element>
+    </xsd:schema>
+    <resheader name="resmimetype">
+        <value>text/microsoft-resx</value>
+    </resheader>
+    <resheader name="version">
+        <value>1.3</value>
+    </resheader>
+    <resheader name="reader">
+        <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+    </resheader>
+    <resheader name="writer">
+        <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+    </resheader>
+    <data name="emailTemplate" xml:space="preserve">
+        <value />
+    </data>
+    <data name="admin user does not exist" xml:space="preserve">
+        <value />
+    </data>
+    <data name="incorrect username or password" xml:space="preserve">
+        <value />
+    </data>
+    <data name="credential could not be encoded" xml:space="preserve">
+        <value />
+    </data>
+    <data name="user password may have been changed" xml:space="preserve">
+        <value />
+    </data>
+    <data name="verification code error or expired" xml:space="preserve">
+        <value />
+    </data>
+    <data name="email to admin user created template" xml:space="preserve">
+        <value />
+    </data>
+    <data name="email to operator created template" xml:space="preserve">
+        <value />
+    </data>
+    <data name="super administrator account cannot be deleted" xml:space="preserve">
+        <value />
+    </data>
+    <data name="super administrator account cannot be edited" xml:space="preserve">
+        <value />
+    </data>
+    <data name="user does not have permission to operate" xml:space="preserve">
+        <value />
+    </data>
+    <data name="new email has been added" xml:space="preserve">
+        <value />
+    </data>
+    <data name="email cannot be empty" xml:space="preserve">
+        <value />
+    </data>
+    <data name="new password cannot be empty" xml:space="preserve">
+        <value />
+    </data>
+    <data name="confirm new password cannot be empty" xml:space="preserve">
+        <value />
+    </data>
+    <data name="new password and the confirmed password do not match" xml:space="preserve">
+        <value />
+    </data>
+    <data name="email is not valid" xml:space="preserve">
+        <value />
+    </data>
+</root>

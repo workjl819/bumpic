@@ -1,0 +1,65 @@
+<root>
+    <resheader name="resmimetype">
+        <value>text/microsoft-resx</value>
+    </resheader>
+    <resheader name="version">
+        <value>1.3</value>
+    </resheader>
+    <resheader name="reader">
+        <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+    </resheader>
+    <resheader name="writer">
+        <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+    </resheader>
+    <data name="emailTemplate" xml:space="preserve">
+        <value>&lt;!DOCTYPE html&gt;&lt;html lang="en"&gt;&lt;head&gt; &lt;meta charset="UTF-8"&gt; &lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt; &lt;title&gt;Watt Verification Email&lt;/title&gt; &lt;style&gt; body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f5f5f5; } .container { max-width: 600px; margin: 20px auto; background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 10px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); } .header { background-color: #0078d4; color: #ffffff; padding: 10px 20px; border-radius: 10px 10px 0 0; text-align: left; } .header img { max-width: 100px; } .content { padding: 20px 20px 10px 20px; } .content p { margin: 0; line-height: 1.5; } .content .highlight { font-weight: bold; color: #0078d4; } .footer { font-size: 12px; color: #666666; padding: 5px 20px; } &lt;/style&gt;&lt;/head&gt;&lt;body&gt; &lt;div class="container"&gt; &lt;div class="header"&gt; &lt;p&gt;&lt;strong&gt; Watt &lt;/strong&gt;&lt;/p&gt; &lt;/div&gt; &lt;div class="content"&gt; &lt;p&gt;&lt;strong&gt;[ Watt ] 验证码&lt;/strong&gt;&lt;/p&gt; &lt;br/&gt; &lt;p&gt;您的验证码是 &lt;span class="highlight"&gt;${verify-code}&lt;/span&gt;，验证有效期为10分钟。&lt;/p&gt; &lt;br/&gt; &lt;/div&gt; &lt;div class="footer"&gt; &lt;p&gt;Watt 系统邮件，请勿回复。&lt;/p&gt; &lt;p&gt;官方网站: &lt;a href="www.interpaystellar.com"&gt;www.interpaystellar.com&lt;/a&gt; 官方邮箱: &lt;a href="mailto:contact@interpaystellar.com"&gt;contact@interpaystellar.com&lt;/a&gt;&lt;/p&gt; &lt;/div&gt; &lt;/div&gt;&lt;/body&gt;&lt;/html&gt;</value>
+    </data>
+    <data name="admin user does not exist" xml:space="preserve">
+        <value>管理员不存在</value>
+    </data>
+    <data name="email has been registered and user disabled" xml:space="preserve">
+        <value>该邮箱已注册, 用户已被禁用，请联系管理员</value>
+    </data>
+    <data name="credential could not be encoded" xml:space="preserve">
+        <value>凭证无法被编码</value>
+    </data>
+    <data name="user password may have been changed" xml:space="preserve">
+        <value>用户密码可能被修改请重新登陆</value>
+    </data>
+    <data name="verification code error or expired" xml:space="preserve">
+        <value>验证码错误或已过期</value>
+    </data>
+    <data name="email to admin user created template" xml:space="preserve">
+        <value>您已成为WATT平台的管理员，网址为 ${host} ，默认登录账号为邮箱地址，默认密码为 ${password}。祝您工作顺利！</value>
+    </data>
+    <data name="email to operator created template" xml:space="preserve">
+        <value>您已成为WATT平台的运营人员，网址为 ${host} ，默认登录账号为邮箱地址，默认密码为 ${password}。祝您工作顺利！</value>
+    </data>
+    <data name="super administrator account cannot be deleted" xml:space="preserve">
+        <value>超级管理员账号不可删除</value>
+    </data>
+    <data name="super administrator account cannot be edited" xml:space="preserve">
+        <value>超级管理员账号不可编辑</value>
+    </data>
+    <data name="user does not have permission to operate" xml:space="preserve">
+        <value>您没有权限操作</value>
+    </data>
+    <data name="new email has been added" xml:space="preserve">
+        <value>该新邮箱已经被添加</value>
+    </data>
+    <data name="email cannot be empty" xml:space="preserve">
+        <value>邮箱不能为空</value>
+    </data>
+    <data name="new password cannot be empty" xml:space="preserve">
+        <value>新密码不能为空</value>
+    </data>
+    <data name="confirm new password cannot be empty" xml:space="preserve">
+        <value>确认新密码不能为空</value>
+    </data>
+    <data name="new password and the confirmed password do not match" xml:space="preserve">
+        <value>新密码和确认密码不一致</value>
+    </data>
+    <data name="email is not valid" xml:space="preserve">
+        <value>邮箱不合法</value>
+    </data>
+</root>

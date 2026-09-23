@@ -8,17 +8,25 @@ using StackExchange.Redis;
 using FluentValidation.AspNetCore;
 using Bumpic.Web.Clients;
 using Bumpic.Web.Extensions;
+using Bumpic.Web.Options;
 using Bumpic.Web.Utils;
 using FastEndpoints;
+using FastEndpoints.Swagger;
 using Serilog;
 using Serilog.Formatting.Json;
 using Hangfire;
 using Hangfire.Redis.StackExchange;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Json;
+using Microsoft.IdentityModel.Tokens;
+using NetCorePal.Context;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using Refit;
 using NetCorePal.Extensions.CodeAnalysis;
+using NetCorePal.Extensions.MultiEnv;
+using Serilog.Events;
+using Serilog.Formatting.Compact;
 
 Log.Logger = new LoggerConfiguration()
     .Enrich.WithClientIp()
@@ -27,7 +35,62 @@ Log.Logger = new LoggerConfiguration()
 try
 {
     var builder = WebApplication.CreateBuilder(args);
-    builder.Host.UseSerilog();
+    builder.Configuration.AddJsonFile("/app/appconfig.json", optional: true);
+    builder.Services.Configure<AppOptions>(builder.Configuration.GetSection("App"));
+    var appOptions = new AppOptions();
+    builder.Configuration.GetSection("App").Bind(appOptions);
+    
+    
+    #region Serilog
+
+    
+    if (!builder.Environment.IsDevelopment())
+    {
+        builder.Logging.ClearProviders();
+        builder.Host.UseSerilog((context, services, configuration) =>
+            {
+                configuration
+                    .ReadFrom.Configuration(context.Configuration)
+                    .Enrich.FromLogContext()
+                    .Enrich.WithClientIp()
+                    .MinimumLevel.Override(
+                        source: "Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddleware",
+                        LogEventLevel.Fatal
+                    )
+                    .WriteTo.Console(new CompactJsonFormatter());
+                configuration
+                    .MinimumLevel.Override("Microsoft", LogEventLevel.Error);
+            },
+            writeToProviders: true);
+    }
+
+    #endregion
+    
+    #region Config
+    
+    var jwtConfig = new JwtConfig();
+    builder.Services.Configure<JwtConfig>(builder.Configuration.GetSection("Jwt"));
+    builder.Configuration.GetSection("Jwt").Bind(jwtConfig);
+    builder.Services.AddSingleton<JwtGenerator>();
+    
+    RedisOptions redisOptions = new();
+
+    builder.Configuration.GetSection("Redis").Bind(redisOptions);
+    var co = new ConfigurationOptions();
+    co.EndPoints.Add(redisOptions.Host, redisOptions.Port);
+    co.DefaultDatabase = redisOptions.Database;
+    co.Password = redisOptions.Password;
+    var redis = await ConnectionMultiplexer.ConnectAsync(co);
+    builder.Services.AddSingleton<IConnectionMultiplexer>(_ => redis);
+    
+    var envOption = new EnvOptions();
+    builder.Configuration.GetSection("Env").Bind(envOption);
+    var displayEnv = string.IsNullOrEmpty(envOption.ServiceEnv) ? "main" : envOption.ServiceEnv;
+
+    var hangfireJobConfiguration = builder.Configuration.GetSection("HangfireJob");
+    builder.Services.AddOptions<HangfireJobOptions>().Bind(hangfireJobConfiguration).ValidateOnStart();
+    
+    #endregion
 
     #region SignalR
 
@@ -35,6 +98,7 @@ try
     builder.Services.AddMvc()
         .AddNewtonsoftJson(options => { options.SerializerSettings.AddNetCorePalJsonConverters(); });
     builder.Services.AddSignalR();
+    
 
     #endregion
 
@@ -49,45 +113,124 @@ try
     // Add services to the container.
 
     #region 身份认证
-
-    var redis = await ConnectionMultiplexer.ConnectAsync(builder.Configuration.GetConnectionString("Redis")!);
-    builder.Services.AddSingleton<IConnectionMultiplexer>(_ => redis);
     
     // DataProtection - use custom extension that resolves IConnectionMultiplexer from DI
     builder.Services.AddDataProtection()
-        .PersistKeysToStackExchangeRedis("DataProtection-Keys");
+        .PersistKeysToDbContext<ApplicationDbContext>();
+    JsonWebKeysOptions certsOptions = new();
+    builder.Configuration.Bind(certsOptions);
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddCookie()
+        .AddJwtBearer(jwtBearerOptions =>
+        {
+            jwtBearerOptions.MapInboundClaims = false;
+            jwtBearerOptions.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateAudience = false,
+                ValidateIssuer = false,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                TryAllIssuerSigningKeys = true,
+                ValidAudience = jwtConfig.Audience,
+                ValidIssuer = jwtConfig.Issuer,
+            };
+            jwtBearerOptions.Events = new JwtBearerEvents
+            {
+                OnMessageReceived = context =>
+                {
+                    var accessToken = context.Request.Query["access_token"];
+                    // If the request is for our hub...
+                    var path = context.HttpContext.Request.Path;
+                    if (!string.IsNullOrEmpty(accessToken) &&
+                        (path.StartsWithSegments("/hubs/notify")
+                         ||
+                         path.StartsWithSegments("/mapteam")))
+                    {
+                        // Read the token out of the query string
+                        context.Token = accessToken;
+                    }
 
-      // 配置JWT认证
-   builder.Services.Configure<AppConfiguration>(builder.Configuration.GetSection("AppConfiguration"));
-   var appConfig = builder.Configuration.GetSection("AppConfiguration").Get<AppConfiguration>() ?? new AppConfiguration { JwtIssuer = "netcorepal", JwtAudience = "netcorepal" };
-   
-   builder.Services.AddAuthentication().AddJwtBearer(options =>
-   {
-       options.RequireHttpsMetadata = false;
-       options.TokenValidationParameters.ValidAudience = appConfig.JwtAudience;
-       options.TokenValidationParameters.ValidateAudience = true;
-       options.TokenValidationParameters.ValidIssuer = appConfig.JwtIssuer;
-       options.TokenValidationParameters.ValidateIssuer = true;
-   });
-    builder.Services.AddNetCorePalJwt().AddRedisStore();
+                    return Task.CompletedTask;
+                }
+            };
+        });
 
+    // 添加Redis连接
+    builder.Services.AddNetCorePalJwt().AddRedisStore(); // 使用Redis存储密钥
+
+    builder.Services.AddAuthorizationBuilder()
+        .AddPolicy(PolicyNames.Client, policy =>
+        {
+            policy.RequireAuthenticatedUser();
+            policy.RequireClaim("type", TokenType.Client);
+            policy.AuthenticationSchemes.Add(JwtBearerDefaults.AuthenticationScheme);
+        })
+        .AddPolicy(PolicyNames.Admin, policy =>
+        {
+            policy.RequireAuthenticatedUser();
+            policy.RequireClaim("type", TokenType.Admin);
+            policy.AuthenticationSchemes.Add(JwtBearerDefaults.AuthenticationScheme);
+        }).AddPolicy(PolicyNames.AdminOnly, policy =>
+        {
+            policy.RequireAuthenticatedUser();
+            policy.RequireClaim("type", TokenType.Admin);
+            policy.RequireRole("admin");
+            policy.AuthenticationSchemes.Add(JwtBearerDefaults.AuthenticationScheme);
+        }).AddPolicy(PolicyNames.RefreshToken, policy =>
+        {
+            policy.RequireAuthenticatedUser();
+            policy.RequireClaim("refresh-token", "true");
+            policy.AuthenticationSchemes.Add(JwtBearerDefaults.AuthenticationScheme);
+        });
+
+    builder.Services.AddLoginUser();
     #endregion
 
 
     #region Controller
 
     builder.Services.AddControllers().AddNetCorePalSystemTextJson();
-    // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-    builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen(c => c.AddEntityIdSchemaMap()); //强类型id swagger schema 映射
-
+    if (appOptions.EnableSwagger)
+    {
+        builder.Services.AddEndpointsApiExplorer();
+        builder.Services.AddSwaggerGen(c => c.AddEntityIdSchemaMap()); //强类型id swagger schema 映射
+    }
     #endregion
 
     #region FastEndpoints
 
-    builder.Services.AddFastEndpoints(o => o.IncludeAbstractValidators = true);
+    builder.Services.AddFastEndpoints(o => { o.IncludeAbstractValidators = true; });
     builder.Services.Configure<JsonOptions>(o =>
         o.SerializerOptions.AddNetCorePalJsonConverters());
+    //缓存
+    builder.Services.AddResponseCaching();
+    builder.Services.AddStackExchangeRedisOutputCache(options =>
+    {
+        options.Configuration =
+            $"{redisOptions.Host}:{redisOptions.Port},password={redisOptions.Password},defaultDatabase={redisOptions.Database}";
+    });
+    if (appOptions.EnableSwagger)
+    {
+        builder.Services.SwaggerDocument(o =>
+        {
+            o.DocumentSettings = s =>
+            {
+                s.Version = "v1"; //must match what's being passed in to the map method below
+                s.Title = $"{appOptions.Name} [env={displayEnv}]";
+            };
+            //自动Tag路径
+            o.AutoTagPathSegmentIndex = 0;
+        });
+    }
+    #endregion
+    
+    
+    #region 公共服务
+
+    builder.Services.AddSingleton<IClock, SystemClock>();
+    builder.Services.AddHttpContextAccessor();
+    builder.Services.AddRequestCancellationToken();
+    builder.Services.AddRequestTimeouts();
 
     #endregion
 
@@ -96,6 +239,30 @@ try
     builder.Services.AddFluentValidationAutoValidation();
     builder.Services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
     builder.Services.AddKnownExceptionErrorModelInterceptor();
+
+    #endregion
+    
+    
+    
+    #region Query
+
+    builder.Services.AddAllQueries();
+
+    #endregion
+
+    
+    #region RabbitMQ
+
+    builder.Services.AddRabbitMQ(builder.Configuration.GetSection("RabbitMQ"));
+
+    #endregion
+    
+    
+    #region 服务注册发现
+
+    builder.Services.AddAllContext();
+    builder.Services.AddNetCorePalServiceDiscoveryClient();
+    builder.Services.Configure<EnvOptions>(builder.Configuration.GetSection("Env"));
 
     #endregion
 
@@ -107,8 +274,14 @@ try
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
     {
         options.UseMySql(builder.Configuration.GetConnectionString("MySql"),
-            new MySqlServerVersion(new Version(8, 0, 34)));
-        // 仅在开发环境启用敏感数据日志，防止生产环境泄露敏感信息
+            new MySqlServerVersion(new Version(5, 7, 30)),
+            b =>
+            {
+                b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName);
+                b.UseMicrosoftJson();
+            });
+        options.LogTo(Console.WriteLine, LogLevel.Information)
+            .EnableDetailedErrors();
         if (builder.Environment.IsDevelopment())
         {
             options.EnableSensitiveDataLogging();
@@ -127,16 +300,37 @@ try
         });
 
 
+    //配置多环境Options
+    builder.Services.Configure<EnvOptions>(envOptions => builder.Configuration.GetSection("Env").Bind(envOptions));
+    builder.Services.AddContext().AddEnvContext().AddCapContextProcessor();
+    var rabbitMqOptions = new RabbitMQOptions();
+    var rabbitmqSection = builder.Configuration.GetSection("RabbitMQ");
+    rabbitmqSection.Bind(rabbitMqOptions);
     builder.Services.AddCap(x =>
     {
+        x.TopicNamePrefix = "bumpic";
+        x.DefaultGroupName = appOptions.Name;
+        x.Version = displayEnv;
+        x.FailedRetryCount = 3;
         x.UseNetCorePalStorage<ApplicationDbContext>();
-        x.JsonSerializerOptions.AddNetCorePalJsonConverters();
-        x.ConsumerThreadCount = Environment.ProcessorCount;
-        x.UseRabbitMQ(p => builder.Configuration.GetSection("RabbitMQ").Bind(p));
-        x.UseDashboard(); //CAP Dashboard  path：  /cap
+        x.UseRabbitMQ(p =>
+        {
+            p.HostName = rabbitMqOptions.HostName;
+            p.UserName = rabbitMqOptions.Username;
+            p.Password = rabbitMqOptions.Password;
+            p.Port = rabbitMqOptions.Port;
+            p.VirtualHost = rabbitMqOptions.VirtualHost;
+            p.ExchangeName = "bumpic";
+        });
+        x.UseDashboard(options =>
+        {
+            options.PathMatch = $"/{appOptions.DashBoardPathPrefix}/cap";
+        }); //CAP Dashboard  path：  /cap
     });
 
     #endregion
+    
+    builder.Services.AddCommandLocks(Assembly.GetExecutingAssembly());
 
     builder.Services.AddMediatR(cfg =>
         cfg.RegisterServicesFromAssemblies(Assembly.GetExecutingAssembly())
@@ -168,13 +362,50 @@ try
             client.BaseAddress = new Uri(builder.Configuration.GetValue<string>("https+http://user:8080")!))
         .AddMultiEnvMicrosoftServiceDiscovery() //多环境服务发现支持
         .AddStandardResilienceHandler(); //添加标准的重试策略
-
+    
+    builder.Services.AddClients();
     #endregion
 
     #region Jobs
 
-    builder.Services.AddHangfire(x => { x.UseRedisStorage(builder.Configuration.GetConnectionString("Redis")); });
-    builder.Services.AddHangfireServer(); //hangfire dashboard  path：  /hangfire
+    builder.Services.AddJobs();
+    builder.Services.AddHangfire(x =>
+    {
+        var hangfireRedis = builder.Configuration.GetConnectionString("hangfireRedis");
+        x.UseFilter(new AutomaticRetryAttribute { Attempts = 1 });
+        x.UseRedisStorage(!string.IsNullOrEmpty(hangfireRedis) ? ConnectionMultiplexer.Connect(hangfireRedis) : redis,
+            new RedisStorageOptions
+            {
+                Prefix = string.IsNullOrEmpty(envOption.ServiceEnv)
+                    ? "hangfire:Bumpic:"
+                    : $"hangfire:Bumpic-{envOption.ServiceEnv}:",
+                Db = !string.IsNullOrEmpty(hangfireRedis) ? 0 : redisOptions.Database
+            });
+    });
+    builder.Services.AddHangfireServer(option =>
+        option.SchedulePollingInterval = TimeSpan.FromSeconds(1)); //hangfire dashboard  path：  /hangfire
+
+    #endregion
+    
+    
+    #region Cros
+
+    builder.Services.AddCors(option =>
+    {
+        option.AddDefaultPolicy(policy =>
+        {
+            policy.AllowAnyOrigin()
+                .AllowAnyMethod()
+                .AllowAnyHeader();
+        });
+        option.AddPolicy("imageDownload",
+            policy =>
+            {
+                policy.AllowAnyOrigin()
+                    .AllowAnyMethod()
+                    .AllowAnyHeader();
+            });
+    });
 
     #endregion
 
@@ -186,10 +417,39 @@ try
     {
         using var scope = app.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        await dbContext.Database.MigrateAsync();
+        // 测试等场景可通过配置改为按当前模型建库（EnsureCreated），
+        // 以便数据库包含全部 DbSet 对应的表而不依赖 Migration 文件。
+        if (string.Equals(app.Configuration["Database:InitializeMode"], "EnsureCreated", StringComparison.OrdinalIgnoreCase))
+        {
+            await dbContext.Database.EnsureCreatedAsync();
+        }
+        else
+        {
+            await dbContext.Database.MigrateAsync();
+        }
+    }
+    else
+    {
+        using var scope = app.Services.CreateScope();
+        if (appOptions.UseMigrateDatabase)
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await dbContext.Database.MigrateAsync();
+        }
     }
 
+    
+    app.UseForwardedHeaders();
 
+    app.UseContext();
+    app.Use(async (context, next) =>
+    {
+        var contextAccessor = context.RequestServices.GetRequiredService<IContextAccessor>();
+        contextAccessor.SetContext(new CultureContext(Thread.CurrentThread.CurrentCulture.Name));
+        await next(context);
+    });
+
+    app.UseAuthentication(); // Authentication 必须在 Authorization 之前
     app.UseKnownExceptionHandler();
     // Configure the HTTP request pipeline.
     if (app.Environment.IsDevelopment())
@@ -201,11 +461,23 @@ try
     app.UseStaticFiles();
     //app.UseHttpsRedirection();
     app.UseRouting();
-    app.UseAuthentication(); // Authentication 必须在 Authorization 之前
     app.UseAuthorization();
 
     app.MapControllers();
     app.UseFastEndpoints();
+    
+    
+    if (appOptions.EnableSwagger)
+    {
+        app.UseSwaggerGen(
+            config: c => { c.Path = $"/{appOptions.DashBoardPathPrefix}/swagger/{{documentName}}/swagger.{{json|yaml}}"; },
+            uiConfig: u =>
+            {
+                u.Path = $"/{appOptions.DashBoardPathPrefix}/swagger";
+                u.DocumentPath =
+                    $"/{appOptions.DashBoardPathPrefix}/swagger/{{documentName}}/swagger.{{json|yaml}}";
+            });
+    }
 
     #region SignalR
 
@@ -227,7 +499,15 @@ try
         return Results.Content(html, "text/html; charset=utf-8");
     });
     
-    app.UseHangfireDashboard();
+    app.UseHangfireDashboard($"/{appOptions.DashBoardPathPrefix}/hangfire", new DashboardOptions()
+    {
+        Authorization = new[] { new HangfireNoAuthorizationFilter() }
+    });
+    
+    if (app.Configuration.GetValue("RegisterJobs", true))
+    {
+        app.RegisterJobs();
+    }
     await app.RunAsync();
 }
 catch (Exception ex)
