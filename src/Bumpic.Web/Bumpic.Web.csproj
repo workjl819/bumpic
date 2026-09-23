@@ -17,6 +17,8 @@
     <PackageReference Include="FastEndpoints" />
     <PackageReference Include="FastEndpoints.Swagger" />
     <PackageReference Include="FastEndpoints.Swagger.Swashbuckle" />
+    <PackageReference Include="Google.Apis.AndroidPublisher.v3" />
+    <PackageReference Include="Google.Apis.Auth" />
     <PackageReference Include="FluentValidation.AspNetCore" />
     <PackageReference Include="Hangfire.AspNetCore" />
     <PackageReference Include="Hangfire.Redis.StackExchange" />
@@ -29,6 +31,7 @@
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+    <PackageReference Include="Mimo.AppStoreServerLibrary" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" />
     <PackageReference Include="NetCorePal.Context.AspNetCore" />
     <PackageReference Include="NetCorePal.Context.CAP" />

@@ -3,6 +3,7 @@ using Hangfire;
 using Hangfire.Annotations;
 using Hangfire.Common;
 using Microsoft.Extensions.Options;
+using Bumpic.Web.Application.Jobs;
 
 namespace Bumpic.Web.Extensions;
 
@@ -16,7 +17,10 @@ public static class JobExtensions
     /// </summary>
     public static IServiceCollection AddJobs(this IServiceCollection services)
     {
-        // services.AddTransient<DemoJob>();
+        services.AddTransient<ProcessStoreNotificationInboxJob>();
+        services.AddTransient<CompletePendingStoreTransactionJob>();
+        services.AddTransient<VerifyPendingStoreTransactionJob>();
+        services.AddTransient<PurgeDeletedAccountsJob>();
 
         return services;
     }
@@ -28,6 +32,22 @@ public static class JobExtensions
     {
         GlobalConfiguration.Configuration.UseActivator(new ContainerJobActivator(app.ApplicationServices));
         var recurringJobManager = app.ApplicationServices.GetRequiredService<IRecurringJobManager>();
+        recurringJobManager.AddOrUpdate<ProcessStoreNotificationInboxJob>(
+            methodCall: job => job.RunAsync(CancellationToken.None),
+            cronExpression: Cron.Minutely,
+            timeZone: TimeZoneInfo.Utc);
+        recurringJobManager.AddOrUpdate<CompletePendingStoreTransactionJob>(
+            methodCall: job => job.RunAsync(CancellationToken.None),
+            cronExpression: Cron.Minutely,
+            timeZone: TimeZoneInfo.Utc);
+        recurringJobManager.AddOrUpdate<VerifyPendingStoreTransactionJob>(
+            methodCall: job => job.RunAsync(CancellationToken.None),
+            cronExpression: Cron.Hourly,
+            timeZone: TimeZoneInfo.Utc);
+        recurringJobManager.AddOrUpdate<PurgeDeletedAccountsJob>(
+            methodCall: job => job.ExecuteAsync(CancellationToken.None),
+            cronExpression: "0 * * * *",
+            timeZone: TimeZoneInfo.Utc);
         
         /*recurringJobManager.AddOrUpdate<DemoJob>(
             methodCall: job => job.ExecuteAsync(CancellationToken.None),

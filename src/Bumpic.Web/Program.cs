@@ -9,6 +9,12 @@ using FluentValidation.AspNetCore;
 using Bumpic.Web.Clients;
 using Bumpic.Web.Extensions;
 using Bumpic.Web.Options;
+using Bumpic.Web.Services.EmailCodes;
+using Bumpic.Web.Services.ExternalIdentities;
+using Bumpic.Web.Services.SessionTokens;
+using Bumpic.Web.Clients.Store;
+using Bumpic.Web.Services.Store;
+using Bumpic.Web.Endpoints.StoreNotification;
 using Bumpic.Web.Utils;
 using FastEndpoints;
 using FastEndpoints.Swagger;
@@ -37,6 +43,16 @@ try
     var builder = WebApplication.CreateBuilder(args);
     builder.Configuration.AddJsonFile("/app/appconfig.json", optional: true);
     builder.Services.Configure<AppOptions>(builder.Configuration.GetSection("App"));
+    builder.Services.AddOptions<AppleStoreOptions>()
+        .Bind(builder.Configuration.GetSection("Payment:Apple"))
+        .Validate(options => AppleStoreEnvironmentResolver.IsDeploymentEnvironment(options.Environment),
+            "Apple 支付环境配置不受支持，后端部署只允许 Sandbox 或 Production。")
+        .ValidateOnStart();
+    builder.Services.Configure<GooglePlayOptions>(builder.Configuration.GetSection("Payment:Google"));
+    builder.Services.AddSingleton<IValidateOptions<RewardPointsOptions>, RewardPointsOptionsValidator>();
+    builder.Services.AddOptions<RewardPointsOptions>()
+        .Bind(builder.Configuration.GetSection("RewardPoints"))
+        .ValidateOnStart();
     var appOptions = new AppOptions();
     builder.Configuration.GetSection("App").Bind(appOptions);
     
@@ -153,6 +169,23 @@ try
                     return Task.CompletedTask;
                 }
             };
+        })
+        .AddJwtBearer(HandleGooglePlayNotificationEndpoint.AuthenticationScheme, jwtBearerOptions =>
+        {
+            var googlePushOptions = builder.Configuration.GetSection("Payment:Google")
+                .Get<GooglePlayOptions>() ?? new GooglePlayOptions();
+            jwtBearerOptions.MapInboundClaims = false;
+            jwtBearerOptions.Authority = googlePushOptions.PushOidcAuthority;
+            jwtBearerOptions.Audience = googlePushOptions.PushAudience;
+            jwtBearerOptions.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateAudience = true,
+                ValidateIssuer = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                ValidAudience = googlePushOptions.PushAudience,
+                ValidIssuers = ["https://accounts.google.com", "accounts.google.com"]
+            };
         });
 
     // 添加Redis连接
@@ -184,6 +217,33 @@ try
         });
 
     builder.Services.AddLoginUser();
+    builder.Services.AddSingleton<SessionTokenIssuer>();
+    builder.Services.Configure<EmailCodeOptions>(builder.Configuration.GetSection("EmailCode"));
+    builder.Services.Configure<ForPublishEmailOption>(builder.Configuration.GetSection("ForPublishEmail"));
+    builder.Services.Configure<EmailSenderOptions>(builder.Configuration.GetSection("Email"));
+    builder.Services.AddSingleton<IEmailCodeSender, SmtpEmailCodeSender>();
+    builder.Services.AddSingleton<IEmailCodeStore, RedisEmailCodeStore>();
+    builder.Services.AddSingleton<IEmailCodeService, EmailCodeService>();
+    builder.Services.AddSingleton<IValidateOptions<AccountDeletionOptions>, AccountDeletionOptionsValidator>();
+    builder.Services.AddOptions<AccountDeletionOptions>().Bind(builder.Configuration.GetSection("AccountDeletion")).ValidateOnStart();
+    builder.Services.AddMemoryCache();
+    builder.Services.Configure<AppleExternalIdentityOptions>(builder.Configuration.GetSection("ExternalIdentity:Apple"));
+    builder.Services.Configure<GoogleExternalIdentityOptions>(builder.Configuration.GetSection("ExternalIdentity:Google"));
+    var appleAuthBaseUrl = builder.Configuration.GetValue<string>("ExternalIdentity:Apple:BaseUrl") ?? "https://appleid.apple.com";
+    var googleAuthBaseUrl = builder.Configuration.GetValue<string>("ExternalIdentity:Google:BaseUrl") ?? "https://www.googleapis.com";
+    builder.Services.AddRefitClient<IAppleAuthClient>()
+        .ConfigureHttpClient(client => client.BaseAddress = new Uri(appleAuthBaseUrl));
+    builder.Services.AddRefitClient<IGoogleAuthClient>()
+        .ConfigureHttpClient(client => client.BaseAddress = new Uri(googleAuthBaseUrl));
+    builder.Services.AddTransient<PlatformJwksProvider>();
+    builder.Services.AddTransient<AppleExternalIdentityVerifier>();
+    builder.Services.AddTransient<GoogleExternalIdentityVerifier>();
+    builder.Services.AddHttpClient(ExternalIdentityRevocationService.AppleHttpClientName,
+        client => client.BaseAddress = new Uri(appleAuthBaseUrl));
+    builder.Services.AddHttpClient(ExternalIdentityRevocationService.GoogleOAuthHttpClientName,
+        client => client.BaseAddress = new Uri(builder.Configuration.GetValue<string>("ExternalIdentity:Google:OAuthBaseUrl") ?? "https://oauth2.googleapis.com"));
+    builder.Services.AddSingleton<IRevocationTokenProtector, RevocationTokenProtector>();
+    builder.Services.AddScoped<IExternalIdentityRevocationService, ExternalIdentityRevocationService>();
     #endregion
 
 
@@ -228,6 +288,18 @@ try
     #region 公共服务
 
     builder.Services.AddSingleton<IClock, SystemClock>();
+    builder.Services.AddSingleton<IStoreVerificationRequestHasher, StoreVerificationRequestHasher>();
+    builder.Services.AddSingleton<AppleSignedDataPayloadVerifier>();
+    builder.Services.AddHttpClient("apple-app-store-server-api");
+    builder.Services.AddSingleton<IAppleAppStoreServerApiClient, MimoAppleAppStoreServerApiClient>();
+    builder.Services.AddSingleton<MimoAppleStoreClient>();
+    builder.Services.AddSingleton<IAppleStoreClient>(provider => provider.GetRequiredService<MimoAppleStoreClient>());
+    builder.Services.AddSingleton<IAppleSignedPayloadVerifier>(provider => provider.GetRequiredService<MimoAppleStoreClient>());
+    builder.Services.AddSingleton<IAppleStoreNotificationParser, AppleStoreNotificationParser>();
+    builder.Services.AddSingleton<IGooglePlayNotificationParser, GooglePlayNotificationParser>();
+    builder.Services.AddTransient<IStoreNotificationProcessor, StoreNotificationProcessor>();
+    builder.Services.AddSingleton<GooglePlayServiceFactory>();
+    builder.Services.AddSingleton<IGooglePlayClient, GooglePlayClient>();
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddRequestCancellationToken();
     builder.Services.AddRequestTimeouts();
@@ -462,6 +534,7 @@ try
     //app.UseHttpsRedirection();
     app.UseRouting();
     app.UseAuthorization();
+    app.UseMiddleware<Bumpic.Web.Middlewares.LoginUserMiddleware>();
 
     app.MapControllers();
     app.UseFastEndpoints();
