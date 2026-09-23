@@ -1,0 +1,21 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Build.targets" />
+    <File Path="Directory.Packages.props" />
+    <File Path="eng/versions.props" />
+    <File Path="global.json" />
+    <File Path="NuGet.config" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Bumpic.Domain/Bumpic.Domain.csproj" />
+    <Project Path="src/Bumpic.Infrastructure/Bumpic.Infrastructure.csproj" />
+    <Project Path="src/Bumpic.Web/Bumpic.Web.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/Bumpic.Domain.Tests/Bumpic.Domain.Tests.csproj" />
+    <Project Path="test/Bumpic.Infrastructure.Tests/Bumpic.Infrastructure.Tests.csproj" />
+    <Project Path="test/Bumpic.Web.Tests/Bumpic.Web.Tests.csproj" />
+  </Folder>
+</Solution>
