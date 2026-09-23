@@ -9,6 +9,7 @@ using Bumpic.Web.Application.Queries.Authentication;
 using Bumpic.Web.Application.Queries.Registration;
 using Bumpic.Web.Services.ExternalIdentities;
 using Bumpic.Web.Services.SessionTokens;
+using Bumpic.Web.Services.Invitations;
 using Bumpic.Web.Shared;
 
 namespace Bumpic.Web.Endpoints.Authentication;
@@ -47,7 +48,7 @@ public class LoginWithGoogleExternalIdentityRequestValidator : Validator<LoginWi
 /// <remarks>
 /// 平台身份已绑定：直接登录，返回 Action=LoggedIn；
 /// 平台身份未绑定：信任令牌中已验证的邮箱（email_verified=true），该邮箱已注册时绑定到该账户并返回 Action=Bound，
-/// 该邮箱未注册时先注册账户再绑定并返回 Action=Registered（复用邮箱注册命令）；
+/// 该邮箱未注册时先注册账户再绑定并返回 Action=Registered（与邮箱注册效果一致，注册赠点等后续动作相同）；
 /// 令牌未包含已验证邮箱（例如 Apple 仅在首次授权返回邮箱）时返回 EXTERNAL_IDENTITY_EMAIL_REQUIRED，
 /// 前端应改为邮箱验证码登录后携带登录令牌再次调用本接口完成绑定。
 /// </remarks>
@@ -58,6 +59,7 @@ public class LoginWithGoogleExternalIdentityEndpoint(
     IMediator mediator,
     SessionTokenIssuer sessionTokenIssuer,
     GoogleExternalIdentityVerifier googleVerifier,
+    IInvitationWindowStore invitationWindowStore,
     ILogger<LoginWithGoogleExternalIdentityEndpoint> logger)
     : Endpoint<LoginWithGoogleExternalIdentityRequest, ResponseData<ExternalIdentityAuthenticationResponse>>
 {
@@ -92,7 +94,7 @@ public class LoginWithGoogleExternalIdentityEndpoint(
                 action = ExternalIdentityAuthenticationAction.Registered;
                 try
                 {
-                    // 复用邮箱注册命令创建账户。
+                    // 复用邮箱注册命令：注册赠点等后续动作与邮箱注册完全一致。
                     await mediator.Send(new RegisterWithEmailCommand(EmailAddress: principal.VerifiedEmail), cancellationToken);
                 }
                 catch (KnownException exception) when (exception.Message == "EMAIL_ALREADY_REGISTERED")
@@ -128,8 +130,15 @@ public class LoginWithGoogleExternalIdentityEndpoint(
         await mediator.Send(new RecordUserLoginCommand(account.UserId), cancellationToken);
 
         var sessionTokens = await sessionTokenIssuer.GenerateAsync(account.UserId, account.EmailAddress, cancellationToken);
-        var response = ExternalIdentityAuthenticationResponse.Build(action, sessionTokens, account);
+        // 自动注册的新账户没有机会在注册时提交邀请码：开通限时补交窗口，客户端据此弹窗引导。
+        InvitationWindowInfo? invitationWindow = null;
+        if (action == ExternalIdentityAuthenticationAction.Registered)
+        {
+            var windowToken = await invitationWindowStore.OpenAsync(account.UserId, cancellationToken);
+            invitationWindow = new InvitationWindowInfo(windowToken, (int)InvitationWindowStore.WindowTtl.TotalSeconds);
+        }
+
+        var response = ExternalIdentityAuthenticationResponse.Build(action, sessionTokens, account, invitationWindow);
         await Send.OkAsync(response.AsSuccessResponseData(), cancellation: cancellationToken);
     }
 }
-

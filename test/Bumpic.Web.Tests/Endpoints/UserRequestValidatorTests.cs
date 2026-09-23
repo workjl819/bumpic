@@ -97,25 +97,28 @@ public class UserRequestValidatorTests
         var result = _registerValidator.TestValidate(new RegisterWithEmailRequest
         {
             EmailAddress = "user@example.com",
-            EmailCode = "123456"
+            EmailCode = "123456",
+            InvitationCode = "ABCD2345EFGH"
         });
 
         result.ShouldNotHaveAnyValidationErrors();
     }
 
     /// <summary>
-    /// 邮箱注册：邮箱或验证码无效时报错。
+    /// 邮箱注册：邮箱、验证码缺失或邀请码超长时报错。
     /// </summary>
     [Theory]
-    [InlineData("", "123456")]
-    [InlineData("not-an-email", "123456")]
-    [InlineData("user@example.com", "")]
-    public void Register_InvalidRequest_HasErrors(string emailAddress, string emailCode)
+    [InlineData("", "123456", null)]
+    [InlineData("not-an-email", "123456", null)]
+    [InlineData("user@example.com", "", null)]
+    [InlineData("user@example.com", "123456", "TOO-LONG-INVITATION-CODE")]
+    public void Register_InvalidRequest_HasErrors(string emailAddress, string emailCode, string? invitationCode)
     {
         var request = new RegisterWithEmailRequest
         {
             EmailAddress = emailAddress,
-            EmailCode = emailCode
+            EmailCode = emailCode,
+            InvitationCode = invitationCode is null ? null : new string('A', 65)
         };
 
         var result = _registerValidator.TestValidate(request);

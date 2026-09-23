@@ -30,7 +30,11 @@ public record RegisterWithEmailRequest
     [Required]
     public string EmailCode { get; init; } = string.Empty;
 
-
+    /// <summary>
+    /// 可选邀请码：由邀请人分享。邀请码无效或已使用时不影响注册，仅不建立邀请关系；邀请人已达邀请人数上限时注册失败并返回 INVITATION_LIMIT_REACHED。注册后不可补填。
+    /// </summary>
+    /// <example>ABCD2345EFGH</example>
+    public string? InvitationCode { get; init; }
 }
 
 /// <summary>
@@ -50,6 +54,8 @@ public class RegisterWithEmailRequestValidator : Validator<RegisterWithEmailRequ
         RuleFor(x => x.EmailCode)
             .NotEmpty().WithMessage("验证码不能为空")
             .MaximumLength(16).WithMessage("验证码长度不能超过 16 个字符");
+        RuleFor(x => x.InvitationCode)
+            .MaximumLength(64).WithMessage("邀请码长度不能超过 64 个字符");
     }
 }
 
@@ -81,7 +87,8 @@ public class RegisterWithEmailEndpoint(
 
         var registered = await mediator.Send(
             new RegisterWithEmailCommand(
-                EmailAddress: email),
+                EmailAddress: email,
+                InvitationCode: request.InvitationCode),
             cancellationToken);
 
         var account = await mediator.Send(
